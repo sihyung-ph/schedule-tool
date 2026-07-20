@@ -1370,18 +1370,20 @@ function buildTournamentJSON(def, fromDate){
     (byKey[k]||(byKey[k]=[])).push(b);
   }
   const PK="GP)CONTENT#"+def.GameTitle, nowISO=new Date().toISOString();
-  // SeasonSetting 상위 시작/종료는 고정값 (재임포트 시 시작시간 변동 방지 — 실제 일정은 CustomSeasonDatas)
-  const FIXED_START="2020-01-01T00:00:00", FIXED_END="2200-01-01T00:00:00";
+  // SeasonSetting 상위: EndAt 고정. StartAt = 2020-01-01 에서 DefKey 끝 숫자만큼 밀어 토너별로 다르게(시즌ID 중복 방지). 실제 일정은 CustomSeasonDatas.
+  const SEASON_BASE="2020-01-01", FIXED_END="2200-01-01T00:00:00";
   const sched=[]; let seasonTotal=0; const durWarn=[];
   for(const key of Object.keys(byKey)){
     const arr=byKey[key].slice().sort((a,b)=> dayIndex(a.startDate)-dayIndex(b.startDate) || (a.subLane||0)-(b.subLane||0));
     const seasons=arr.map(b=>({ StartAt:`${b.startDate}T00:00:00`, EndAt:`${addDays(b.startDate,b.days)}T00:00:00` }));
     seasonTotal+=seasons.length;
     const cid=key; // ContentId = 토너 DefKey 그대로
+    const nm=key.match(/(\d+)$/); const nseq=nm?parseInt(nm[1],10):1; // DefKey 맨 뒤 숫자 (없으면 1)
+    const startAt=`${addDays(SEASON_BASE, Math.max(0,nseq-1))}T00:00:00`; // 2020-01-01 + (숫자-1)일 → 커지면 월 넘어감
     const days0=arr[0].days; if(arr.some(b=>b.days!==days0)) durWarn.push(key);
     const fdef=defOf(arr[0]);
     sched.push({
-      SeasonSetting:{ StartAt:FIXED_START, EndAt:FIXED_END, PeriodUnit:6, PeriodValue:days0, IrregularPeriodMinutes:null, CustomSeasonDatas:seasons },
+      SeasonSetting:{ StartAt:startAt, EndAt:FIXED_END, PeriodUnit:6, PeriodValue:days0, IrregularPeriodMinutes:null, CustomSeasonDatas:seasons },
       MaxEntryGroupSize:def.MaxEntryGroupSize, RewardClaimableSeasonCount:def.RewardClaimableSeasonCount, RewardDurationMin:def.RewardDurationMin,
       SeparateByUserTags:def.SeparateByUserTags, NoWindow:def.NoWindow, IsRelationShipContent:def.IsRelationShipContent,
       ActiveRankBoardRegister:def.ActiveRankBoardRegister, SetScoreType:def.SetScoreType, FreezeProfileCache:def.FreezeProfileCache,
