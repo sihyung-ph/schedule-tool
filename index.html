@@ -104,6 +104,10 @@
   #imgDlg .img-preview-wrap { flex:1; min-height:200px; max-height:66vh; overflow:auto; border:1px solid #e0e3e8; border-radius:10px; background:#f6f8fa; display:flex; align-items:center; justify-content:center; padding:10px; margin:8px 0; }
   #imgDlg .img-preview-wrap img { max-width:100%; display:block; box-shadow:0 2px 10px rgba(0,0,0,.12); border-radius:6px; }
   #imgDlg .actions button { padding:8px 16px; font-size:13px; }
+  #verList .verrow { display:flex; justify-content:space-between; gap:10px; padding:9px 12px; cursor:pointer; border-bottom:1px solid #eef0f3; font-size:13px; align-items:center; }
+  #verList .verrow:hover { background:#eef5ff; }
+  #verList .verrow .vn { font-weight:600; color:#2a2f36; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  #verList .verrow .vm { color:#8a92a0; font-size:11px; white-space:nowrap; flex:0 0 auto; }
 
   .marquee { position: fixed; border: 1.5px solid #2d6cdf; background: rgba(45,108,223,.12); z-index: 999; pointer-events: none; }
 
@@ -206,6 +210,9 @@
     <button id="saveAsProj" class="accent icon" title="다른 이름으로 저장 — 새 파일명 지정해 별도 파일로">💾+</button>
     <button id="loadProj" class="accent icon" title="편집본 열기 — 백업 파일 복원">📂</button>
     <span class="sep"></span>
+    <button id="shareSave" title="공유 폴더에 버전 저장 (Drive/Dropbox 동기화 폴더 → 팀 공유)">☁ 버전 저장</button>
+    <button id="shareOpen" title="공유 폴더의 버전 목록에서 골라 열기 (팀원이 내 저장본 받기)">☁ 버전 열기</button>
+    <span class="sep"></span>
     <button id="exportData" title="스케쥴 데이터만 JSON 내보내기 (저장 위치 선택)">⬆ 스케쥴 내보내기</button>
     <button id="importData" title="스케쥴 데이터 JSON 불러와 타임라인에 배치">⬇ 스케쥴 가져오기</button>
     <button id="exportSetup" title="스케쥴별 추출 유형 일괄 설정">📤 추출 설정</button>
@@ -232,6 +239,15 @@
       <div class="meta">A <b>이전</b>에 시작하는 막대는 삭제, A 부터 유지. A 가 편집기 <b>첫 날</b>이 됨. (되돌리기: Ctrl+Z)</div>
       <div class="meta" id="trim_preview" style="color:#c44;min-height:14px"></div>
       <div class="actions"><div></div><div class="right"><button type="button" id="trim_cancel">취소</button><button type="button" class="primary" id="trim_ok">잘라내기</button></div></div>
+    </form>
+  </dialog>
+
+  <dialog id="verDlg">
+    <form method="dialog" class="dlg" style="width:min(92vw,560px)">
+      <h3>☁ 버전 열기 (공유 폴더)</h3>
+      <div class="meta">공유 폴더의 저장 버전 목록 (최신순). 클릭하면 불러옵니다. (Drive 데스크톱 동기화 폴더 지정)</div>
+      <div id="verList" style="max-height:52vh;overflow:auto;border:1px solid #e0e3e8;border-radius:8px;margin:8px 0"></div>
+      <div class="actions"><div><button type="button" id="ver_pickdir">📁 폴더 다시 지정</button></div><div class="right"><button type="button" id="ver_cancel">닫기</button></div></div>
     </form>
   </dialog>
 
@@ -1171,6 +1187,54 @@ document.getElementById("loadProj").addEventListener("click",async()=>{
 });
 document.getElementById("fileProj").addEventListener("change",e=>{ const f=e.target.files[0]; if(!f)return; const r=new FileReader(); r.onload=()=>loadProjectText(r.result); r.readAsText(f,"utf-8"); e.target.value=""; });
 
+// ===== ☁ 공유 폴더 버전 저장/열기 (Google Drive 데스크톱 동기화 폴더 + File System Access) =====
+let shareDir=null;
+function fmtStamp(){ const n=new Date(), p=x=>String(x).padStart(2,"0"); return `${n.getFullYear()}-${p(n.getMonth()+1)}-${p(n.getDate())}_${p(n.getHours())}${p(n.getMinutes())}`; }
+async function getShareDir(forcePick){
+  if(!window.showDirectoryPicker) throw new Error("이 브라우저는 폴더 접근 미지원 — Chrome/Edge 를 쓰세요.");
+  if(!forcePick){
+    if(!shareDir){ try{ shareDir=await idbGet("shareDir"); }catch(_){} }
+    if(shareDir){ try{ if(await ensurePerm(shareDir)) return shareDir; }catch(_){} }
+  }
+  shareDir=await window.showDirectoryPicker({mode:"readwrite"});
+  try{ await idbSet("shareDir",shareDir); }catch(_){}
+  if(!(await ensurePerm(shareDir))) throw new Error("폴더 권한 거부됨");
+  return shareDir;
+}
+async function saveVersion(){
+  let dir; try{ dir=await getShareDir(false); }catch(e){ if(e.name!=="AbortError") alert(e.message); return; }
+  let label=prompt("버전 이름 (파일명) — 공유 폴더에 저장됩니다", fmtStamp());
+  if(label===null) return; label=label.trim(); if(!label) return;
+  const safe=label.replace(/[\/\\:*?"<>|]/g,"_"); const name=/\.json$/i.test(safe)?safe:safe+".json";
+  try{
+    const fh=await dir.getFileHandle(name,{create:true}); const w=await fh.createWritable(); await w.write(snapshot()); await w.close();
+    updSaveStatus("☁ "+name); flashSaved();
+    alert(`공유 폴더에 저장됨:\n${name}\n\n동기화 앱(Google Drive 데스크톱)이 자동 업로드 → 팀원은 '☁ 버전 열기'로 받습니다.`);
+  }catch(e){ alert("버전 저장 실패: "+e.message); }
+}
+const verDlg=document.getElementById("verDlg");
+let verFiles=[];
+async function openVersion(force){
+  let dir; try{ dir=await getShareDir(!!force); }catch(e){ if(e.name!=="AbortError") alert(e.message); return; }
+  const files=[];
+  try{ for await (const [nm,h] of dir.entries()){ if(h.kind==="file" && /\.json$/i.test(nm)){ const f=await h.getFile(); files.push({name:nm, mtime:f.lastModified, handle:h}); } } }
+  catch(e){ alert("폴더 읽기 실패: "+e.message+"\n폴더를 다시 지정해 보세요."); return; }
+  if(!files.length){ alert("공유 폴더에 .json 버전 파일이 없습니다."); return; }
+  files.sort((a,b)=>b.mtime-a.mtime); verFiles=files;
+  document.getElementById("verList").innerHTML=files.map((f,i)=>`<div class="verrow" data-i="${i}"><span class="vn">${escapeHtml(f.name)}</span><span class="vm">${new Date(f.mtime).toLocaleString()}</span></div>`).join("");
+  if(!verDlg.open) verDlg.showModal();
+}
+document.getElementById("shareSave").addEventListener("click",saveVersion);
+document.getElementById("shareOpen").addEventListener("click",()=>openVersion(false));
+document.getElementById("ver_pickdir").addEventListener("click",()=>openVersion(true));
+document.getElementById("ver_cancel").addEventListener("click",()=>verDlg.close());
+document.getElementById("verList").addEventListener("click",async e=>{
+  const row=e.target.closest(".verrow"); if(!row) return;
+  const f=verFiles[+row.dataset.i]; if(!f) return;
+  try{ const file=await f.handle.getFile(); const txt=await file.text(); verDlg.close(); loadProjectText(txt); updSaveStatus("☁ "+f.name); }
+  catch(err){ alert("열기 실패: "+err.message); }
+});
+
 // ===== 스케쥴 데이터(배치된 스케쥴만) 내보내기/가져오기 =====
 function exportScheduleData(){
   const sorted=[...state.bars].sort((a,b)=> dayIndex(a.startDate)-dayIndex(b.startDate) || a.subLane-b.subLane);
@@ -1306,19 +1370,18 @@ function buildTournamentJSON(def, fromDate){
     (byKey[k]||(byKey[k]=[])).push(b);
   }
   const PK="GP)CONTENT#"+def.GameTitle, nowISO=new Date().toISOString();
-  const shiftYears=(isoDate,dy)=>{ const p=isoDate.split("-"); return `${(+p[0]+dy)}-${p[1]}-${p[2]}T00:00:00`; };
+  // SeasonSetting 상위 시작/종료는 고정값 (재임포트 시 시작시간 변동 방지 — 실제 일정은 CustomSeasonDatas)
+  const FIXED_START="2020-01-01T00:00:00", FIXED_END="2200-01-01T00:00:00";
   const sched=[]; let seasonTotal=0; const durWarn=[];
   for(const key of Object.keys(byKey)){
     const arr=byKey[key].slice().sort((a,b)=> dayIndex(a.startDate)-dayIndex(b.startDate) || (a.subLane||0)-(b.subLane||0));
     const seasons=arr.map(b=>({ StartAt:`${b.startDate}T00:00:00`, EndAt:`${addDays(b.startDate,b.days)}T00:00:00` }));
     seasonTotal+=seasons.length;
     const cid=key; // ContentId = 토너 DefKey 그대로
-    const minStart=arr.reduce((m,b)=> b.startDate<m?b.startDate:m, arr[0].startDate);
-    const maxEnd=arr.reduce((m,b)=>{ const e=addDays(b.startDate,b.days); return e>m?e:m; }, addDays(arr[0].startDate,arr[0].days));
     const days0=arr[0].days; if(arr.some(b=>b.days!==days0)) durWarn.push(key);
     const fdef=defOf(arr[0]);
     sched.push({
-      SeasonSetting:{ StartAt:shiftYears(minStart,-10), EndAt:shiftYears(maxEnd,10), PeriodUnit:6, PeriodValue:days0, IrregularPeriodMinutes:null, CustomSeasonDatas:seasons },
+      SeasonSetting:{ StartAt:FIXED_START, EndAt:FIXED_END, PeriodUnit:6, PeriodValue:days0, IrregularPeriodMinutes:null, CustomSeasonDatas:seasons },
       MaxEntryGroupSize:def.MaxEntryGroupSize, RewardClaimableSeasonCount:def.RewardClaimableSeasonCount, RewardDurationMin:def.RewardDurationMin,
       SeparateByUserTags:def.SeparateByUserTags, NoWindow:def.NoWindow, IsRelationShipContent:def.IsRelationShipContent,
       ActiveRankBoardRegister:def.ActiveRankBoardRegister, SetScoreType:def.SetScoreType, FreezeProfileCache:def.FreezeProfileCache,
