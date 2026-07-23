@@ -210,11 +210,6 @@
     <button id="saveAsProj" class="accent icon" title="다른 이름으로 저장 — 새 파일명 지정해 별도 파일로">💾+</button>
     <button id="loadProj" class="accent icon" title="편집본 열기 — 백업 파일 복원">📂</button>
     <span class="sep"></span>
-    <button id="shareSave" title="공유 폴더에 버전 저장 (Drive/Dropbox 동기화 폴더 → 팀 공유)">☁ 버전 저장</button>
-    <button id="shareOpen" title="공유 폴더의 버전 목록에서 골라 열기 (팀원이 내 저장본 받기)">☁ 버전 열기</button>
-    <span class="sep"></span>
-    <button id="exportData" title="스케쥴 데이터만 JSON 내보내기 (저장 위치 선택)">⬆ 스케쥴 내보내기</button>
-    <button id="importData" title="스케쥴 데이터 JSON 불러와 타임라인에 배치">⬇ 스케쥴 가져오기</button>
     <button id="exportSetup" title="스케쥴별 추출 유형 일괄 설정">📤 추출 설정</button>
     <button id="copyLive" title="라이브이벤트 테이블용 데이터 클립보드 복사 → 구글시트 붙여넣기">📋 라이브 테이블 복사</button>
     <button id="copyTourney" title="토너먼트 운영툴용 JSON 추출 (고정 베이스 + 스케쥴토너) → 클립보드 복사">📋 토너먼트 추출</button>
@@ -1224,8 +1219,7 @@ async function openVersion(force){
   document.getElementById("verList").innerHTML=files.map((f,i)=>`<div class="verrow" data-i="${i}"><span class="vn">${escapeHtml(f.name)}</span><span class="vm">${new Date(f.mtime).toLocaleString()}</span></div>`).join("");
   if(!verDlg.open) verDlg.showModal();
 }
-document.getElementById("shareSave").addEventListener("click",saveVersion);
-document.getElementById("shareOpen").addEventListener("click",()=>openVersion(false));
+// (버튼 숨김) ☁ 버전 저장/열기 — 함수 saveVersion/openVersion 은 보존, 버튼만 제거
 document.getElementById("ver_pickdir").addEventListener("click",()=>openVersion(true));
 document.getElementById("ver_cancel").addEventListener("click",()=>verDlg.close());
 document.getElementById("verList").addEventListener("click",async e=>{
@@ -1276,7 +1270,7 @@ function importScheduleData(text){
   save(); syncToolbar(); render();
   alert(`스케쥴 ${newBars.length}개 가져옴`);
 }
-document.getElementById("exportData").addEventListener("click",exportScheduleData);
+// (버튼 숨김) ⬆ 스케쥴 내보내기 — exportScheduleData 보존
 
 // ===== 추출 유형 일괄 설정 (매트릭스) =====
 const exportDlg=document.getElementById("exportDlg");
@@ -1490,7 +1484,7 @@ document.getElementById("tn_ok").addEventListener("click",()=>{
     alert(msg);
   }).catch(e=>{ document.getElementById("tn_status").textContent="❌ 복사 실패: "+e.message; });
 });
-document.getElementById("importData").addEventListener("click",()=>openFile("fileData", txt=>{ try{ importScheduleData(txt); }catch(err){ alert("가져오기 실패: "+err.message); } }));
+// (버튼 숨김) ⬇ 스케쥴 가져오기 — importScheduleData 보존
 document.getElementById("fileData").addEventListener("change",e=>{ const f=e.target.files[0]; if(!f)return; const r=new FileReader(); r.onload=()=>{ try{ importScheduleData(r.result); }catch(err){ alert("가져오기 실패: "+err.message); } }; r.readAsText(f,"utf-8"); e.target.value=""; });
 document.getElementById("resetAll").addEventListener("click",()=>{ if(!confirm("모든 데이터를 지울까요? (되돌리기 X — 필요시 JSON 저장)"))return; localStorage.removeItem("scheduleToolV3"); seed(); nextId_reset(); selectedSet=new Set(); selectedId=null; undoStack.length=0; redoStack.length=0; save(); syncToolbar(); renderPalette(); render(); updHistBtns(); });
 function nextId_reset(){ /* nextId already advanced by seed */ }
