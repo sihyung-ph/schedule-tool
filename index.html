@@ -217,7 +217,7 @@
     <button id="imgExport" title="지정 기간 스케쥴 표를 이쁜 이미지(PNG)로 — 미리보기 + 저장/클립보드">🖼 이미지</button>
     <span class="sep"></span>
     <button id="resetAll">초기화</button>
-    <span id="saveStatus" style="color:#1f9d6b;font-size:11px;font-weight:600;min-width:80px"></span>
+    <span id="saveStatus" title="현재 편집중인 편집본(버전) 파일" style="color:#137a51;font-size:14px;font-weight:700;padding:4px 11px;border-radius:7px;background:#e7f7ef;border:1px solid #a9dcc5;white-space:nowrap"></span>
     <input type="file" id="fileProj" accept=".json" style="display:none">
     <input type="file" id="fileData" accept=".json" style="display:none">
     <span class="hint">팔레트→그리드=배치 · 막대드래그=이동 · 빈곳드래그=다중선택 · 더블클릭=편집 · Delete=삭제</span>
@@ -1140,7 +1140,7 @@ async function idbSet(k,v){ const db=await idbOpen(); return new Promise((res,re
 async function idbGet(k){ const db=await idbOpen(); return new Promise((res,rej)=>{ const t=db.transaction("kv","readonly"); const q=t.objectStore("kv").get(k); q.onsuccess=()=>res(q.result); q.onerror=()=>rej(q.error); }); }
 let projHandle=null;
 (async()=>{ try{ projHandle=await idbGet("projHandle")||null; updSaveStatus(projHandle?"● "+projHandle.name:""); }catch(e){} })();
-function updSaveStatus(t){ const el=document.getElementById("saveStatus"); if(el) el.textContent=t; }
+function updSaveStatus(t){ const el=document.getElementById("saveStatus"); if(!el) return; el.textContent = t ? ("📄 "+t.replace(/^[●✓☁]\s*/,"")) : "📄 저장 파일 없음 (💾로 저장)"; el.style.opacity = t ? "1" : ".6"; }
 function flashSaved(){ const n=new Date(); updSaveStatus("✓ 저장됨 "+pad(n.getHours())+":"+pad(n.getMinutes())+(projHandle?" · "+projHandle.name:"")); }
 
 // ===== 편집본(툴 전체 상태) 저장/열기 =====
