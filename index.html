@@ -1215,7 +1215,7 @@ document.getElementById("loadProj").addEventListener("click",()=>{ if(driveClien
 document.getElementById("fileProj").addEventListener("change",e=>{ const f=e.target.files[0]; if(!f)return; const r=new FileReader(); r.onload=()=>loadProjectText(r.result); r.readAsText(f,"utf-8"); e.target.value=""; });
 
 // ===== ☁ Google Drive 연동 (OAuth 토큰 + Drive v3 REST) — 열기 / 저장(덮어쓰기) / 다른이름저장 =====
-const DRIVE_CLIENT_ID_DEFAULT="";                              // 발급 후 여기에 넣으면 팀원은 입력 불필요
+const DRIVE_CLIENT_ID_DEFAULT="113742590577-ijtii442dfj73fp572iccom4997ta0m9.apps.googleusercontent.com"; // Google Cloud 프로젝트 schedule-tool (Internal). 비밀값 아님 — 팀원은 입력 없이 로그인만
 const DRIVE_ROOT_DEFAULT="1RC5tQz4B9ZC3Yt39TVcm4_C8u2EeUeuG";   // 스케쥴 공유 폴더(루트)
 const DRIVE_SCOPE="https://www.googleapis.com/auth/drive";
 const DV_COMMON="supportsAllDrives=true&includeItemsFromAllDrives=true";
