@@ -104,10 +104,12 @@
   #imgDlg .img-preview-wrap { flex:1; min-height:200px; max-height:66vh; overflow:auto; border:1px solid #e0e3e8; border-radius:10px; background:#f6f8fa; display:flex; align-items:center; justify-content:center; padding:10px; margin:8px 0; }
   #imgDlg .img-preview-wrap img { max-width:100%; display:block; box-shadow:0 2px 10px rgba(0,0,0,.12); border-radius:6px; }
   #imgDlg .actions button { padding:8px 16px; font-size:13px; }
-  #verList .verrow { display:flex; justify-content:space-between; gap:10px; padding:9px 12px; cursor:pointer; border-bottom:1px solid #eef0f3; font-size:13px; align-items:center; }
-  #verList .verrow:hover { background:#eef5ff; }
-  #verList .verrow .vn { font-weight:600; color:#2a2f36; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  #verList .verrow .vm { color:#8a92a0; font-size:11px; white-space:nowrap; flex:0 0 auto; }
+  #verList .verrow, #dv_list .verrow { display:flex; justify-content:space-between; gap:10px; padding:9px 12px; cursor:pointer; border-bottom:1px solid #eef0f3; font-size:13px; align-items:center; }
+  #verList .verrow:hover, #dv_list .verrow:hover { background:#eef5ff; }
+  #verList .verrow .vn, #dv_list .verrow .vn { font-weight:600; color:#2a2f36; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  #verList .verrow .vm, #dv_list .verrow .vm { color:#8a92a0; font-size:11px; white-space:nowrap; flex:0 0 auto; }
+  #dv_list .verrow.dir .vn { color:#1f5fbf; }
+  #dv_list .empty { padding:14px; color:#9aa0a8; font-size:13px; }
 
   .marquee { position: fixed; border: 1.5px solid #2d6cdf; background: rgba(45,108,223,.12); z-index: 999; pointer-events: none; }
 
@@ -206,10 +208,11 @@
     <button id="undoBtn" class="icon" title="실행취소 (Ctrl/⌘+Z)">↶</button>
     <button id="redoBtn" class="icon" title="다시실행 (Ctrl/⌘+Shift+Z)">↷</button>
     <span class="sep"></span>
-    <button id="saveProj" class="accent icon" title="저장 — 현재 파일에 덮어쓰기 (없으면 새로 지정). Ctrl/⌘+S">💾</button>
-    <button id="saveAsProj" class="accent icon" title="다른 이름으로 저장 — 새 파일명 지정해 별도 파일로">💾+</button>
-    <button id="loadProj" class="accent icon" title="편집본 열기 — 백업 파일 복원">📂</button>
+    <button id="saveProj" class="accent icon" title="저장 — 열었던 그 파일에 덮어쓰기 (Drive/로컬). Ctrl/⌘+S">💾</button>
+    <button id="saveAsProj" class="accent icon" title="다른 이름으로 저장 — Drive 폴더·파일명 선택. Ctrl/⌘+Shift+S">💾+</button>
+    <button id="loadProj" class="accent icon" title="열기 — Google Drive 폴더에서 버전 선택 (로컬 파일도 가능)">📂</button>
     <span id="saveStatus" title="현재 편집중인 편집본(버전) 파일" style="color:#137a51;font-size:14px;font-weight:700;padding:4px 11px;border-radius:7px;background:#e7f7ef;border:1px solid #a9dcc5;white-space:nowrap"></span>
+    <button id="driveSet" class="icon" title="Drive 설정 — Client ID · 루트 폴더 ID">⚙</button>
     <span class="sep"></span>
     <button id="exportSetup" title="스케쥴별 추출 유형 일괄 설정">📤 추출 설정</button>
     <button id="copyLive" title="라이브이벤트 테이블용 데이터 클립보드 복사 → 구글시트 붙여넣기">📋 라이브 테이블 복사</button>
@@ -234,6 +237,31 @@
       <div class="meta">A <b>이전</b>에 시작하는 막대는 삭제, A 부터 유지. A 가 편집기 <b>첫 날</b>이 됨. (되돌리기: Ctrl+Z)</div>
       <div class="meta" id="trim_preview" style="color:#c44;min-height:14px"></div>
       <div class="actions"><div></div><div class="right"><button type="button" id="trim_cancel">취소</button><button type="button" class="primary" id="trim_ok">잘라내기</button></div></div>
+    </form>
+  </dialog>
+
+  <dialog id="driveDlg">
+    <form method="dialog" class="dlg" style="width:min(94vw,660px)">
+      <h3 id="dv_title">☁ Drive 열기</h3>
+      <div class="meta" id="dv_path" style="font-weight:600;color:#5b6472">…</div>
+      <div id="dv_list" style="max-height:50vh;overflow:auto;border:1px solid #e0e3e8;border-radius:8px;margin:8px 0;background:#fff"></div>
+      <div class="row" id="dv_saverow" style="display:none"><label>파일명</label><input id="dv_name" type="text" placeholder="v1.4.1.json"></div>
+      <div class="meta" id="dv_status" style="min-height:14px"></div>
+      <div class="actions">
+        <div><button type="button" id="dv_up">⬆ 상위 폴더</button> <button type="button" id="dv_local">💻 로컬 파일</button></div>
+        <div class="right"><button type="button" id="dv_cancel">닫기</button><button type="button" class="primary" id="dv_saveHere" style="display:none">이 폴더에 저장</button></div>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="driveSetDlg">
+    <form method="dialog" class="dlg" style="width:min(92vw,580px)">
+      <h3>⚙ Google Drive 설정</h3>
+      <div class="meta">Drive 열기/저장을 쓰려면 <b>OAuth Client ID</b> 가 필요합니다 (한 번 입력하면 이 브라우저에 저장). 루트 폴더는 스케쥴 공유 폴더 ID.</div>
+      <div class="imgf" style="margin:10px 0"><label>OAuth Client ID</label><input id="ds_client" type="text" placeholder="xxxxxxxx.apps.googleusercontent.com" style="width:100%;box-sizing:border-box"></div>
+      <div class="imgf" style="margin:10px 0"><label>루트 폴더 ID</label><input id="ds_root" type="text" placeholder="1RC5tQz4B9ZC3Yt39TVcm4_C8u2EeUeuG" style="width:100%;box-sizing:border-box"></div>
+      <div class="meta" id="ds_info"></div>
+      <div class="actions"><div><button type="button" id="ds_signout">🔓 로그아웃</button></div><div class="right"><button type="button" id="ds_cancel">취소</button><button type="button" class="primary" id="ds_save">저장</button></div></div>
     </form>
   </dialog>
 
@@ -838,7 +866,7 @@ document.addEventListener("keydown", e=>{
   if((e.ctrlKey||e.metaKey) && !e.altKey && (e.key==="ArrowLeft"||e.key==="ArrowRight") && selectedSet.size && !isTyping(e)){ e.preventDefault(); jumpSelected(e.key==="ArrowLeft"?-1:1); return; }
   if((e.metaKey||e.ctrlKey) && (e.key==="z"||e.key==="Z")){ e.preventDefault(); if(e.shiftKey) redo(); else undo(); return; }
   if((e.metaKey||e.ctrlKey) && (e.key==="y"||e.key==="Y")){ e.preventDefault(); redo(); return; }
-  if((e.metaKey||e.ctrlKey) && (e.key==="s"||e.key==="S")){ e.preventDefault(); if(e.shiftKey) writeProjAs(); else writeProj(); return; }
+  if((e.metaKey||e.ctrlKey) && (e.key==="s"||e.key==="S")){ e.preventDefault(); if(e.shiftKey) saveAsNow(); else saveNow(); return; }
   if((e.metaKey||e.ctrlKey) && (e.key==="c"||e.key==="C") && !isTyping(e)){ if(selectedSet.size){ copySelection(); e.preventDefault(); } return; }
   if((e.metaKey||e.ctrlKey) && (e.key==="v"||e.key==="V") && !isTyping(e)){ if(clipboard&&clipboard.length){ pasteClipboard(); e.preventDefault(); } return; }
   if((e.metaKey||e.ctrlKey) && (e.key==="d"||e.key==="D") && !isTyping(e)){ e.preventDefault(); if(selectedSet.size){ copySelection(); pasteClipboard(); } return; }
@@ -1140,8 +1168,12 @@ async function idbSet(k,v){ const db=await idbOpen(); return new Promise((res,re
 async function idbGet(k){ const db=await idbOpen(); return new Promise((res,rej)=>{ const t=db.transaction("kv","readonly"); const q=t.objectStore("kv").get(k); q.onsuccess=()=>res(q.result); q.onerror=()=>rej(q.error); }); }
 let projHandle=null;
 (async()=>{ try{ projHandle=await idbGet("projHandle")||null; updSaveStatus(projHandle?"● "+projHandle.name:""); }catch(e){} })();
-function updSaveStatus(t){ const el=document.getElementById("saveStatus"); if(!el) return; el.textContent = t ? ("📄 "+t.replace(/^[●✓☁]\s*/,"")) : "📄 저장 파일 없음 (💾로 저장)"; el.style.opacity = t ? "1" : ".6"; }
-function flashSaved(){ const n=new Date(); updSaveStatus("✓ 저장됨 "+pad(n.getHours())+":"+pad(n.getMinutes())+(projHandle?" · "+projHandle.name:"")); }
+function updSaveStatus(t){ const el=document.getElementById("saveStatus"); if(!el) return;
+  if(!t){ el.textContent="📄 저장 파일 없음 (💾로 저장)"; el.style.opacity=".6"; return; }
+  const cloud=/^☁/.test(t) || !!driveFile;
+  el.textContent=(cloud?"☁ ":"📄 ")+t.replace(/^[●✓☁]\s*/,""); el.style.opacity="1"; }
+function flashSaved(){ const n=new Date(); const nm=driveFile?driveFile.name:(projHandle?projHandle.name:"");
+  updSaveStatus((driveFile?"☁ ":"✓ ")+"저장됨 "+pad(n.getHours())+":"+pad(n.getMinutes())+(nm?" · "+nm:"")); }
 
 // ===== 편집본(툴 전체 상태) 저장/열기 =====
 async function ensurePerm(h){ if(!h.queryPermission) return true; if((await h.queryPermission({mode:"readwrite"}))==="granted") return true; return (await h.requestPermission({mode:"readwrite"}))==="granted"; }
@@ -1172,15 +1204,172 @@ async function writeProjAs(){ // 다른 이름으로 저장: 항상 새 파일�
   if(name===null) return; name=name.trim(); if(!name) return; if(!/\.json$/i.test(name)) name+=".json";
   downloadBlob(new Blob([text],{type:"application/json"}),name); flashSaved();
 }
-function loadProjectText(text){ try{ const o=JSON.parse(text); if(!validState(o.state)){alert("편집본 형식이 아닙니다");return;} pushHistory(); state=o.state; if(!state.daysPerRow)state.daysPerRow=60; migrate(); nextId=o.nextId||1; save(); syncToolbar(); renderPalette(); render(); alert("편집본 복원 완료"); }catch(err){alert("실패: "+err.message);} }
-document.getElementById("saveProj").addEventListener("click",()=>writeProj());
-document.getElementById("saveAsProj").addEventListener("click",()=>writeProjAs());
-document.getElementById("loadProj").addEventListener("click",async()=>{
-  // 열기로 고른 파일을 이후 Ctrl+S 덮어쓰기 대상으로도 기억
-  if(window.showOpenFilePicker){ try{ const [h]=await window.showOpenFilePicker({types:[{description:"JSON",accept:{"application/json":[".json"]}}]}); const f=await h.getFile(); projHandle=h; try{ await idbSet("projHandle",h); }catch(_){} updSaveStatus("● "+h.name); loadProjectText(await f.text()); return; }catch(e){ if(e.name==="AbortError") return; } }
+function loadProjectText(text, srcLabel){ try{ const o=JSON.parse(text); if(!validState(o.state)){alert("편집본 형식이 아닙니다");return;} pushHistory(); state=o.state; if(!state.daysPerRow)state.daysPerRow=60; migrate(); nextId=o.nextId||1; save(); syncToolbar(); renderPalette(); render(); alert(srcLabel?("불러옴: "+srcLabel):"편집본 복원 완료"); }catch(err){alert("실패: "+err.message);} }
+async function localOpenProj(){ // 로컬 파일 열기 (Drive 미사용 폴백)
+  if(window.showOpenFilePicker){ try{ const [h]=await window.showOpenFilePicker({types:[{description:"JSON",accept:{"application/json":[".json"]}}]}); const f=await h.getFile(); projHandle=h; driveFile=null; try{ localStorage.removeItem("driveCur"); }catch(_){} try{ await idbSet("projHandle",h); }catch(_){} updSaveStatus("● "+h.name); loadProjectText(await f.text()); return; }catch(e){ if(e.name==="AbortError") return; } }
   document.getElementById("fileProj").click();
-});
+}
+document.getElementById("saveProj").addEventListener("click",()=>saveNow());
+document.getElementById("saveAsProj").addEventListener("click",()=>saveAsNow());
+document.getElementById("loadProj").addEventListener("click",()=>{ if(driveClientId()) openDriveBrowser("open"); else localOpenProj(); });
 document.getElementById("fileProj").addEventListener("change",e=>{ const f=e.target.files[0]; if(!f)return; const r=new FileReader(); r.onload=()=>loadProjectText(r.result); r.readAsText(f,"utf-8"); e.target.value=""; });
+
+// ===== ☁ Google Drive 연동 (OAuth 토큰 + Drive v3 REST) — 열기 / 저장(덮어쓰기) / 다른이름저장 =====
+const DRIVE_CLIENT_ID_DEFAULT="";                              // 발급 후 여기에 넣으면 팀원은 입력 불필요
+const DRIVE_ROOT_DEFAULT="1RC5tQz4B9ZC3Yt39TVcm4_C8u2EeUeuG";   // 스케쥴 공유 폴더(루트)
+const DRIVE_SCOPE="https://www.googleapis.com/auth/drive";
+const DV_COMMON="supportsAllDrives=true&includeItemsFromAllDrives=true";
+var driveFile=null;                 // {id,name,parentId} 현재 편집중 Drive 파일 (var: TDZ 회피)
+let driveTok=null, driveTokenClient=null;
+let dvCwd=null, dvStack=[], dvMode="open", dvItems=[];
+function driveCfg(){ try{ return JSON.parse(localStorage.getItem("driveCfg")||"{}"); }catch(_){ return {}; } }
+function driveClientId(){ return ((driveCfg().clientId||DRIVE_CLIENT_ID_DEFAULT)||"").trim(); }
+function driveRootId(){ return ((driveCfg().rootId||DRIVE_ROOT_DEFAULT)||"").trim(); }
+function driveReq(promptMode){ return new Promise((res,rej)=>{
+  driveTokenClient.callback=r=>{ if(!r||r.error) return rej(new Error((r&&r.error)||"auth_failed")); driveTok=r.access_token; try{ localStorage.setItem("driveGranted","1"); }catch(_){} res(); };
+  try{ driveTokenClient.requestAccessToken({prompt:promptMode}); }catch(e){ rej(e); }
+}); }
+async function driveEnsureToken(){
+  const cid=driveClientId(); if(!cid) throw new Error("NOCID");
+  if(!(window.google&&google.accounts&&google.accounts.oauth2)) throw new Error("Google 로그인 스크립트 로딩 중 — 잠시 후 다시 시도하세요.");
+  if(driveTok) return;
+  if(!driveTokenClient || driveTokenClient.__cid!==cid){
+    driveTokenClient=google.accounts.oauth2.initTokenClient({client_id:cid, scope:DRIVE_SCOPE, callback:()=>{}});
+    driveTokenClient.__cid=cid;
+  }
+  const granted=(()=>{ try{ return localStorage.getItem("driveGranted")==="1"; }catch(_){ return false; } })();
+  if(granted){ try{ await driveReq(""); return; }catch(_){} }
+  await driveReq("consent");
+}
+async function driveApi(url,opt){
+  await driveEnsureToken(); opt=opt||{};
+  const mk=()=>Object.assign({},opt,{headers:Object.assign({},opt.headers||{},{Authorization:"Bearer "+driveTok})});
+  let r=await fetch(url,mk());
+  if(r.status===401){ driveTok=null; await driveEnsureToken(); r=await fetch(url,mk()); }
+  if(!r.ok) throw new Error("HTTP "+r.status+" "+(await r.text()).slice(0,180));
+  return r;
+}
+async function driveList(folderId){
+  const q=`'${folderId}' in parents and trashed=false`;
+  const r=await driveApi(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,name,mimeType,modifiedTime)&orderBy=folder,name&pageSize=300&${DV_COMMON}`);
+  return (await r.json()).files||[];
+}
+async function driveMeta(id){ const r=await driveApi(`https://www.googleapis.com/drive/v3/files/${id}?fields=id,name&${DV_COMMON}`); return await r.json(); }
+async function driveDownload(id){ const r=await driveApi(`https://www.googleapis.com/drive/v3/files/${id}?alt=media&${DV_COMMON}`); return await r.text(); }
+async function driveCreateFile(folderId,name,text){
+  const bnd="sched"+Math.random().toString(36).slice(2);
+  const meta={name,parents:[folderId],mimeType:"application/json"};
+  const body=`--${bnd}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(meta)}\r\n--${bnd}\r\nContent-Type: application/json\r\n\r\n${text}\r\n--${bnd}--`;
+  const r=await driveApi(`https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name&${DV_COMMON}`,{method:"POST",headers:{"Content-Type":"multipart/related; boundary="+bnd},body});
+  return await r.json();
+}
+async function driveUpdateFile(id,text){
+  const r=await driveApi(`https://www.googleapis.com/upload/drive/v3/files/${id}?uploadType=media&fields=id,name&${DV_COMMON}`,{method:"PATCH",headers:{"Content-Type":"application/json"},body:text});
+  return await r.json();
+}
+function projText(){ return JSON.stringify({app:"scheduleTool",ver:3,state,nextId},null,2); }
+function driveRemember(f){ driveFile=f; try{ localStorage.setItem("driveCur",JSON.stringify(f)); }catch(_){} }
+async function driveSaveCurrent(){
+  if(!driveFile){ openDriveBrowser("saveas"); return; }
+  try{ const j=await driveUpdateFile(driveFile.id, projText()); driveRemember({id:driveFile.id,name:j.name||driveFile.name,parentId:driveFile.parentId}); flashSaved(); }
+  catch(e){ if(e.message==="NOCID"){ alert("Drive Client ID 가 필요합니다 — ⚙ 에서 입력하세요."); openDriveSet(); return; } alert("Drive 저장 실패: "+e.message); }
+}
+function saveNow(){ if(driveFile) return driveSaveCurrent(); if(projHandle) return writeProj(); if(driveClientId()) return openDriveBrowser("saveas"); return writeProj(); }
+function saveAsNow(){ if(driveClientId()) return openDriveBrowser("saveas"); return writeProjAs(); }
+// --- Drive 브라우저 다이얼로그 ---
+const driveDlg=document.getElementById("driveDlg");
+function dvSetStatus(t){ const el=document.getElementById("dv_status"); if(el) el.textContent=t||""; }
+async function dvRender(){
+  const list=document.getElementById("dv_list");
+  document.getElementById("dv_path").textContent="📁 "+[...dvStack.map(f=>f.name), dvCwd.name].join(" / ");
+  list.innerHTML=`<div class="empty">불러오는 중…</div>`;
+  let items=[];
+  try{ items=await driveList(dvCwd.id); }
+  catch(e){ list.innerHTML=`<div class="empty">목록 실패: ${escapeHtml(e.message)}</div>`; return; }
+  const dirs=items.filter(f=>f.mimeType==="application/vnd.google-apps.folder");
+  const files=items.filter(f=>f.mimeType!=="application/vnd.google-apps.folder" && /\.json$/i.test(f.name));
+  dvItems=[...dirs,...files];
+  if(!dvItems.length){ list.innerHTML=`<div class="empty">이 폴더에 하위 폴더·json 파일이 없습니다.</div>`; return; }
+  list.innerHTML=dvItems.map((f,i)=>{
+    const isDir=f.mimeType==="application/vnd.google-apps.folder";
+    const when=f.modifiedTime? new Date(f.modifiedTime).toLocaleString() : "";
+    return `<div class="verrow${isDir?" dir":""}" data-i="${i}"><span class="vn">${isDir?"📁":"📄"} ${escapeHtml(f.name)}</span><span class="vm">${isDir?"폴더":when}</span></div>`;
+  }).join("");
+}
+function openDriveBrowser(mode){
+  if(!driveClientId()){ alert("Drive Client ID 가 없습니다.\n⚙ 에서 OAuth Client ID 를 입력하세요."); openDriveSet(); return; }
+  dvMode=mode;
+  document.getElementById("dv_title").textContent = mode==="saveas" ? "☁ Drive 다른 이름으로 저장" : "☁ Drive 열기";
+  document.getElementById("dv_saverow").style.display = mode==="saveas" ? "" : "none";
+  document.getElementById("dv_saveHere").style.display = mode==="saveas" ? "" : "none";
+  document.getElementById("dv_local").textContent = mode==="saveas" ? "💻 로컬로 저장" : "💻 로컬 파일 열기";
+  if(mode==="saveas") document.getElementById("dv_name").value=(driveFile&&driveFile.name)||"schedule.json";
+  dvSetStatus("");
+  if(!driveDlg.open) driveDlg.showModal();
+  (async()=>{
+    try{
+      if(!dvCwd){ const root=await driveMeta(driveRootId()); dvCwd={id:root.id||driveRootId(), name:root.name||"루트"}; dvStack=[]; }
+      await dvRender();
+    }catch(e){
+      const msg = e.message==="NOCID" ? "Client ID 가 필요합니다 (⚙)" : ("Drive 접근 실패: "+e.message);
+      document.getElementById("dv_list").innerHTML=`<div class="empty">${escapeHtml(msg)}</div>`;
+    }
+  })();
+}
+document.getElementById("dv_list").addEventListener("click",async e=>{
+  const row=e.target.closest(".verrow"); if(!row) return;
+  const f=dvItems[+row.dataset.i]; if(!f) return;
+  if(f.mimeType==="application/vnd.google-apps.folder"){ dvStack.push(dvCwd); dvCwd={id:f.id,name:f.name}; dvSetStatus(""); await dvRender(); return; }
+  if(dvMode==="saveas"){ document.getElementById("dv_name").value=f.name; dvSetStatus("파일명 지정됨 — 같은 이름으로 저장하면 새 파일이 추가됩니다(덮어쓰기는 그 파일을 열고 💾)."); return; }
+  dvSetStatus("불러오는 중…");
+  try{
+    const txt=await driveDownload(f.id);
+    driveRemember({id:f.id,name:f.name,parentId:dvCwd.id});
+    projHandle=null;
+    driveDlg.close();
+    loadProjectText(txt, "☁ "+f.name);
+    updSaveStatus("☁ "+f.name);
+  }catch(err){ dvSetStatus("열기 실패: "+err.message); }
+});
+document.getElementById("dv_up").addEventListener("click",async()=>{ if(!dvStack.length){ dvSetStatus("루트 폴더입니다."); return; } dvCwd=dvStack.pop(); dvSetStatus(""); await dvRender(); });
+document.getElementById("dv_cancel").addEventListener("click",()=>driveDlg.close());
+document.getElementById("dv_local").addEventListener("click",()=>{ driveDlg.close(); if(dvMode==="saveas") writeProjAs(); else localOpenProj(); });
+document.getElementById("dv_saveHere").addEventListener("click",async()=>{
+  let nm=(document.getElementById("dv_name").value||"").trim();
+  if(!nm){ dvSetStatus("파일명을 입력하세요"); return; }
+  if(!/\.json$/i.test(nm)) nm+=".json";
+  dvSetStatus("저장 중…");
+  try{
+    const j=await driveCreateFile(dvCwd.id, nm, projText());
+    driveRemember({id:j.id, name:j.name||nm, parentId:dvCwd.id});
+    projHandle=null; driveDlg.close(); flashSaved();
+    alert(`Drive 에 저장됨: ${driveFile.name}\n폴더: ${dvCwd.name}\n\n이후 💾(Ctrl+S)는 이 파일에 덮어쓰기 됩니다.`);
+  }catch(e){ dvSetStatus("저장 실패: "+e.message); }
+});
+// --- Drive 설정 ---
+const driveSetDlg=document.getElementById("driveSetDlg");
+function openDriveSet(){
+  document.getElementById("ds_client").value=driveClientId();
+  document.getElementById("ds_root").value=driveRootId();
+  document.getElementById("ds_info").textContent = driveTok ? "구글 로그인 상태 ✓" : "미로그인 — 열기/저장 시 로그인 팝업이 뜹니다.";
+  if(!driveSetDlg.open) driveSetDlg.showModal();
+}
+document.getElementById("driveSet").addEventListener("click",openDriveSet);
+document.getElementById("ds_cancel").addEventListener("click",()=>driveSetDlg.close());
+document.getElementById("ds_save").addEventListener("click",()=>{
+  const clientId=document.getElementById("ds_client").value.trim(), rootId=document.getElementById("ds_root").value.trim();
+  try{ localStorage.setItem("driveCfg",JSON.stringify({clientId,rootId})); }catch(_){}
+  driveTokenClient=null; driveTok=null; dvCwd=null; dvStack=[];
+  driveSetDlg.close(); alert("Drive 설정 저장됨. 📂 로 Drive 열기, 💾+ 로 Drive 저장.");
+});
+document.getElementById("ds_signout").addEventListener("click",()=>{
+  try{ if(driveTok&&window.google&&google.accounts&&google.accounts.oauth2) google.accounts.oauth2.revoke(driveTok,()=>{}); }catch(_){}
+  driveTok=null; driveFile=null;
+  try{ localStorage.removeItem("driveCur"); localStorage.removeItem("driveGranted"); }catch(_){}
+  updSaveStatus(""); driveSetDlg.close(); alert("Drive 로그아웃됨.");
+});
+// 이전 세션에서 열었던 Drive 파일 복원 (버전칩 표시 + 💾 덮어쓰기 대상)
+try{ const c=JSON.parse(localStorage.getItem("driveCur")||"null"); if(c&&c.id){ driveFile=c; updSaveStatus("☁ "+c.name); } }catch(_){}
 
 // ===== ☁ 공유 폴더 버전 저장/열기 (Google Drive 데스크톱 동기화 폴더 + File System Access) =====
 let shareDir=null;
@@ -1603,5 +1792,6 @@ function syncToolbar(){ document.getElementById("startDate").value=state.startDa
 if(!load()) seed();
 syncToolbar(); renderPalette(); render(); updHistBtns();
 </script>
+<script async defer src="https://accounts.google.com/gsi/client"></script>
 </body>
 </html>
