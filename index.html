@@ -1287,9 +1287,9 @@ async function dvRender(){
   try{ items=await driveList(dvCwd.id); }
   catch(e){ list.innerHTML=`<div class="empty">목록 실패: ${escapeHtml(e.message)}</div>`; return; }
   const dirs=items.filter(f=>f.mimeType==="application/vnd.google-apps.folder");
-  const files=items.filter(f=>f.mimeType!=="application/vnd.google-apps.folder" && /\.json$/i.test(f.name));
+  const files=items.filter(f=>f.mimeType!=="application/vnd.google-apps.folder"); // 확장자 무관 (.json 없이 저장한 버전도 보이게)
   dvItems=[...dirs,...files];
-  if(!dvItems.length){ list.innerHTML=`<div class="empty">이 폴더에 하위 폴더·json 파일이 없습니다.</div>`; return; }
+  if(!dvItems.length){ list.innerHTML=`<div class="empty">이 폴더가 비어 있습니다 (하위 폴더·파일 없음).</div>`; return; }
   list.innerHTML=dvItems.map((f,i)=>{
     const isDir=f.mimeType==="application/vnd.google-apps.folder";
     const when=f.modifiedTime? new Date(f.modifiedTime).toLocaleString() : "";
@@ -1337,7 +1337,7 @@ document.getElementById("dv_local").addEventListener("click",()=>{ driveDlg.clos
 document.getElementById("dv_saveHere").addEventListener("click",async()=>{
   let nm=(document.getElementById("dv_name").value||"").trim();
   if(!nm){ dvSetStatus("파일명을 입력하세요"); return; }
-  if(!/\.json$/i.test(nm)) nm+=".json";
+  // 확장자 강제 안 함 — 입력한 이름 그대로 저장 (Drive mimeType 은 application/json 유지)
   dvSetStatus("저장 중…");
   try{
     const j=await driveCreateFile(dvCwd.id, nm, projText());
