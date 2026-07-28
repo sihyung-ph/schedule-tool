@@ -1499,8 +1499,17 @@ document.getElementById("export_ok").addEventListener("click",()=>exportDlg.clos
 function liveTableTSV(groupStart, fromDate, indexStart, toDate){
   const map=buildSynthMap(); const colCount=SYNTH_FIELDS.length; const daysKey="몇일동안?";
   const iStart=(indexStart==null?1:indexStart);
+  // 정렬 = 시작일 → eventDefinitionKey(추출키) → 이름 → 기간. subLane(줄 위치)은 최후 수단 —
+  // 화면에서 막대를 위아래로 옮겨도 index 가 안 바뀌게(작업자 간 번호 꼬임 방지)
+  const liveSortKey=b=>{ const d=defOf(b); return [String((d&&d.exportKey)||""), String(barName(b)||""), b.days||0]; };
   const bars=state.bars.filter(b=>{ const d=defOf(b); return d && (d.exportTargets||[]).includes("live") && (!fromDate || b.startDate>=fromDate) && (!toDate || b.startDate<=toDate); })
-    .sort((a,b)=> dayIndex(a.startDate)-dayIndex(b.startDate) || a.subLane-b.subLane);
+    .sort((a,b)=>{
+      const dd=dayIndex(a.startDate)-dayIndex(b.startDate); if(dd) return dd;
+      const ka=liveSortKey(a), kb=liveSortKey(b);
+      for(let i=0;i<ka.length;i++){ if(ka[i]===kb[i]) continue;
+        return (typeof ka[i]==="number") ? ka[i]-kb[i] : String(ka[i]).localeCompare(String(kb[i])); }
+      return (a.subLane||0)-(b.subLane||0);
+    });
   if(!bars.length) return "";
   // group = 입력한 시작번호 고정, index = 시작번호부터 연속 증가. 밴드(개행)·줄당일수 같은 화면 레이아웃은 번호에 영향 X
   const grp=(groupStart||1); let seq=0; const lines=[]; const setC=(arr,name,val)=>{ if(map[name]!=null) arr[map[name]]=val; };
