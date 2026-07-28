@@ -294,7 +294,7 @@
     <form method="dialog" class="dlg" style="width:360px">
       <h3>📋 라이브 테이블 복사</h3>
       <div class="row"><label>그룹 시작번호</label><input id="cl_start" type="number" min="0" value="1"></div>
-      <div class="meta">타임라인 한 줄(밴드)이 그룹 하나. 첫 줄 = 시작번호, 다음 줄 +1.</div>
+      <div class="meta">그룹은 <b>이 번호로 고정</b>됩니다 (타임라인 개행·줄당일수와 무관). index 만 아래 시작 인덱스부터 1씩 증가.</div>
       <div class="row"><label>그룹 시작 인덱스</label><input id="cl_idx" type="number" min="0" value="1"></div>
       <div class="meta">각 그룹 안 첫 항목의 index 번호. (예: 1 → _1,_2… / 0 → _0,_1…)</div>
       <div class="row"><label>이 날짜부터</label><input id="cl_from" type="date"></div>
@@ -1502,8 +1502,9 @@ function liveTableTSV(groupStart, fromDate, indexStart, toDate){
   const bars=state.bars.filter(b=>{ const d=defOf(b); return d && (d.exportTargets||[]).includes("live") && (!fromDate || b.startDate>=fromDate) && (!toDate || b.startDate<=toDate); })
     .sort((a,b)=> dayIndex(a.startDate)-dayIndex(b.startDate) || a.subLane-b.subLane);
   if(!bars.length) return "";
-  const counters={}, lines=[]; const setC=(arr,name,val)=>{ if(map[name]!=null) arr[map[name]]=val; };
-  for(const b of bars){ const di=dayIndex(b.startDate); const bandIdx=Math.floor((di-1)/state.daysPerRow); const grp=(groupStart||1)+bandIdx; counters[grp]=(counters[grp]||0)+1; const idx=iStart+counters[grp]-1;
+  // group = 입력한 시작번호 고정, index = 시작번호부터 연속 증가. 밴드(개행)·줄당일수 같은 화면 레이아웃은 번호에 영향 X
+  const grp=(groupStart||1); let seq=0; const lines=[]; const setC=(arr,name,val)=>{ if(map[name]!=null) arr[map[name]]=val; };
+  for(const b of bars){ const idx=iStart+seq; seq++;
     const d=parseD(b.startDate), start=`${b.startDate}T00:00:00Z`, end=`${addDays(b.startDate,b.days)}T00:00:00Z`, bdef=defOf(b);
     const arr=new Array(colCount).fill(""); arr[0]=`EventSchedule_${grp}_${idx}`; arr[1]="EventSchedule";
     setC(arr,"group",grp); setC(arr,"index",idx); setC(arr,"year",d.getUTCFullYear()); setC(arr,"month",d.getUTCMonth()+1); setC(arr,"day",d.getUTCDate());
