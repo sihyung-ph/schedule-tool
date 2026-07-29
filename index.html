@@ -157,8 +157,10 @@
   .exmatrix { width:100%; border-collapse:collapse; font-size:13px; }
   .exmatrix th, .exmatrix td { border:1px solid #e2e4e8; padding:6px 8px; text-align:center; }
   .exmatrix thead th { background:#f0f1f4; position:sticky; top:0; z-index:1; }
-  .exmatrix th.nmcol, .exmatrix td.nmcol { text-align:left; }
+  .exmatrix th.nmcol, .exmatrix td.nmcol { text-align:left; min-width:130px; white-space:nowrap; }
   .exmatrix td.nmcol { display:flex; align-items:center; gap:7px; }
+  .exmatrix select.exsel { padding:4px 6px; border:1px solid #c4c8cd; border-radius:4px; font-size:12px; }
+  #exportDlg .dlg { width:min(96vw,1120px); }
   .exmatrix td.nmcol .dot { width:11px; height:11px; border-radius:3px; flex:0 0 auto; }
   .exmatrix tr.grp td { background:#eef1f5; font-weight:700; color:#555; text-align:left; font-size:12px; }
   .exmatrix td.ck input { width:17px; height:17px; cursor:pointer; }
@@ -324,6 +326,8 @@
           <div class="tnf"><div class="tnlbl">게임 타이틀 <code>GameTitle</code></div><input id="tn_game" type="text" placeholder="idc"><div class="tnhint">PK 생성용. PK = <code>GP)CONTENT#&lt;GameTitle&gt;</code>.</div></div>
           <div class="tnf"><div class="tnlbl">점수 갱신 타입 <code>SetScoreType</code></div><input id="tn_score" type="number"><div class="tnhint"><b>0 = Increase</b> (점수 누적 증가식). 우리는 Increase만 사용.</div></div>
           <div class="tnf"><div class="tnlbl">순환 주기 <code>PeriodUnit</code></div><input type="text" value="Custom (6) — 자동" disabled><div class="tnhint">스케쥴 토너는 <b>항상 Custom(6)</b>. PeriodValue = 막대 기간(days), 시즌은 CustomSeasonDatas 로 입력됨.</div></div>
+          <div class="tnf"><div class="tnlbl">등록 차단(분) 기본값 <code>RegisterBlockedMin</code></div><input id="tn_regblock" type="number" min="0"><div class="tnhint">시즌 종료 전 신규 등록을 차단하는 시간(분). <b>0 = 차단 안함</b>. 예 720 = 종료 12시간 전부터 차단. 📤 추출설정에서 토너별로 덮어쓸 수 있음.</div></div>
+          <div class="tnf"><div class="tnlbl">마지막 그룹 채움 기본값 <code>FillInLast…</code></div><select id="tn_filllast"><option value="0">아니오 (false)</option><option value="1">예 (true)</option></select><div class="tnhint">등록 차단 후 마지막 그룹 채워넣기 (<b>노윈도우 전용</b>). 📤 추출설정에서 토너별 덮어쓰기 가능.</div></div>
           <div class="tnchecks">
             <label title="중첩되지 않는 방식으로 매핑"><input id="tn_nowin" type="checkbox"> 노윈도 <code>NoWindow</code></label>
             <label title="클랜 검사용. 스케쥴 토너는 해제"><input id="tn_rel" type="checkbox"> 관계컨텐츠 <code>IsRelationShipContent</code></label>
@@ -343,9 +347,9 @@
   </dialog>
 
   <dialog id="exportDlg">
-    <form method="dialog" class="dlg" style="width:740px">
+    <form method="dialog" class="dlg">
       <h3>📤 추출 설정</h3>
-      <div style="font-size:12px;color:#888;margin-bottom:8px">각 스케쥴이 어떤 추출 대상에 포함될지 체크 (즉시 저장)</div>
+      <div style="font-size:12px;color:#888;margin-bottom:8px">각 스케쥴이 어떤 추출 대상에 포함될지 체크 (즉시 저장). <b>등록차단·마지막그룹채움</b>은 비우면 「토너먼트 추출 → 고정값 설정」의 기본값 사용.</div>
       <div id="exportMatrix" style="max-height:55vh;overflow:auto"></div>
       <div class="actions"><div></div><div class="right"><button type="button" class="primary" id="export_ok">닫기</button></div></div>
     </form>
@@ -1126,7 +1130,7 @@ function migrate(){ // 부스트 → 가챠부스트 (타입 분리 이전 데�
   if(!Array.isArray(state.palette)||!state.palette.length) state.palette=DEFAULT_PALETTE.slice();
   if(!Array.isArray(state.plans)) state.plans=[];
   if(!Array.isArray(state.planInstances)) state.planInstances=[];
-  state.definitions.forEach(d=>{ if(d.shareWith===undefined) d.shareWith=""; if(d.memo===undefined) d.memo=""; if(!Array.isArray(d.exclusiveWith)) d.exclusiveWith=[]; if(!Array.isArray(d.exportTargets)) d.exportTargets=[]; if(d.exportKey===undefined) d.exportKey=""; if(d.exportEventType===undefined) d.exportEventType=""; if(d.tourneyType===undefined) d.tourneyType=""; if(d.tourneyDefKey===undefined) d.tourneyDefKey=""; });
+  state.definitions.forEach(d=>{ if(d.shareWith===undefined) d.shareWith=""; if(d.memo===undefined) d.memo=""; if(!Array.isArray(d.exclusiveWith)) d.exclusiveWith=[]; if(!Array.isArray(d.exportTargets)) d.exportTargets=[]; if(d.exportKey===undefined) d.exportKey=""; if(d.exportEventType===undefined) d.exportEventType=""; if(d.tourneyType===undefined) d.tourneyType=""; if(d.tourneyDefKey===undefined) d.tourneyDefKey=""; if(d.regBlockMin===undefined) d.regBlockMin=""; if(d.fillLastGroup===undefined) d.fillLastGroup=""; });
   if(state.liveGroupStart===undefined) state.liveGroupStart=1;
   if(state.liveIndexStart===undefined) state.liveIndexStart=1;
   if(state.liveFromDate===undefined) state.liveFromDate="";
@@ -1137,11 +1141,13 @@ function migrate(){ // 부스트 → 가챠부스트 (타입 분리 이전 데�
   if(state.tourneySeason===undefined) state.tourneySeason=1;
   if(state.tourneyBase===undefined) state.tourneyBase="";
   if(!state.tourneyDefaults || typeof state.tourneyDefaults!=="object") state.tourneyDefaults=defaultTourneyDefaults();
+  else { const dt=defaultTourneyDefaults(); for(const k of Object.keys(dt)) if(state.tourneyDefaults[k]===undefined) state.tourneyDefaults[k]=dt[k]; } // 새 필드 보강(기존 저장본 호환)
 }
 function defaultTourneyDefaults(){ return {
   CategoryIds:["Account"], MaxEntryGroupSize:100, RewardClaimableSeasonCount:1, RewardDurationMin:10080,
   SeparateByUserTags:[0], NoWindow:true, IsRelationShipContent:false, ActiveRankBoardRegister:true,
-  SetScoreType:0, FreezeProfileCache:false, PeriodUnit:2, GameTitle:"idc"
+  SetScoreType:0, FreezeProfileCache:false, PeriodUnit:2, GameTitle:"idc",
+  RegisterBlockedMin:0, FillInLastGroupAfterRegisterBlockedMin:false   // 기본값 — 매트릭스에서 프리셋별 override 가능
 }; }
 function load(){ const raw=localStorage.getItem("scheduleToolV3"); if(raw){ try{ const o=JSON.parse(raw); if(!validState(o.state))return false; state=Object.assign({daysPerRow:60},o.state); if(!state.daysPerRow)state.daysPerRow=60; nextId=o.nextId||1; migrate(); return true; }catch(e){console.warn(e);} } return false; }
 // ===== 파일 저장/열기 (경로 선택 — File System Access API, 미지원 시 다운로드/파일선택 폴백) =====
@@ -1467,8 +1473,8 @@ function openExportSetup(){
   const m=document.getElementById("exportMatrix");
   if(!state.definitions.length){ m.innerHTML=`<div style="color:#aaa;padding:12px">스케쥴 프리셋이 없습니다.</div>`; exportDlg.showModal(); return; }
   const byType={}; for(const d of state.definitions){ (byType[d.eventType||"미분류"]||(byType[d.eventType||"미분류"]=[])).push(d); }
-  const colN=4+EXPORT_TARGETS.length;
-  let h=`<table class="exmatrix"><thead><tr><th class="nmcol">스케쥴</th><th>이벤트 DefKey</th><th>이벤트 타입(추출)</th><th>토너 DefKey</th>${EXPORT_TARGETS.map(t=>`<th>${escapeHtml(t.label)}</th>`).join("")}</tr></thead><tbody>`;
+  const colN=6+EXPORT_TARGETS.length;
+  let h=`<table class="exmatrix"><thead><tr><th class="nmcol">스케쥴</th><th>이벤트 DefKey</th><th>이벤트 타입(추출)</th><th>토너 DefKey</th><th title="시즌 종료 전 신규 등록 차단 시간(분). 0=차단 안함. 비우면 고정값 기본값 사용">등록차단(분)</th><th title="등록 차단 후 마지막 그룹 채워넣기 (노윈도우 전용). 비우면 고정값 기본값 사용">마지막그룹<br>채움</th>${EXPORT_TARGETS.map(t=>`<th>${escapeHtml(t.label)}</th>`).join("")}</tr></thead><tbody>`;
   for(const type of Object.keys(byType)){
     h+=`<tr class="grp"><td colspan="${colN}">${escapeHtml(type)}</td></tr>`;
     for(const d of byType[type]){ const set=new Set(d.exportTargets||[]);
@@ -1476,6 +1482,8 @@ function openExportSetup(){
         `<td><input type="text" class="extxt" data-def="${d.key}" data-f="exportKey" value="${escapeHtml(d.exportKey||"")}" placeholder="eventDefinitionKey"></td>`+
         `<td><input type="text" class="extxt" data-def="${d.key}" data-f="exportEventType" value="${escapeHtml(d.exportEventType||"")}" placeholder="테이블용 타입"></td>`+
         `<td><input type="text" class="extxt" data-def="${d.key}" data-f="tourneyDefKey" value="${escapeHtml(d.tourneyDefKey||"")}" placeholder="토너 ContentId (예 Tournament_Arena)"></td>`+
+        `<td><input type="number" min="0" class="extxt" data-def="${d.key}" data-f="regBlockMin" value="${escapeHtml(d.regBlockMin==null?"":String(d.regBlockMin))}" placeholder="기본값" style="width:74px"></td>`+
+        `<td><select class="exsel" data-def="${d.key}" data-f="fillLastGroup"><option value=""${!d.fillLastGroup?" selected":""}>기본값</option><option value="1"${d.fillLastGroup==="1"?" selected":""}>예</option><option value="0"${d.fillLastGroup==="0"?" selected":""}>아니오</option></select></td>`+
         EXPORT_TARGETS.map(t=>`<td class="ck"><input type="checkbox" data-def="${d.key}" data-tgt="${t.key}"${set.has(t.key)?" checked":""}></td>`).join("")+`</tr>`;
     }
   }
@@ -1489,6 +1497,10 @@ function openExportSetup(){
   m.querySelectorAll("input.extxt").forEach(inp=>inp.addEventListener("change",()=>{
     ensure(); const d=state.definitions.find(x=>x.key===inp.dataset.def); if(!d)return;
     d[inp.dataset.f]=inp.value.trim(); save();
+  }));
+  m.querySelectorAll("select.exsel").forEach(sel=>sel.addEventListener("change",()=>{
+    ensure(); const d=state.definitions.find(x=>x.key===sel.dataset.def); if(!d)return;
+    d[sel.dataset.f]=sel.value; save();
   }));
   exportDlg.showModal();
 }
@@ -1575,11 +1587,17 @@ function buildTournamentJSON(def, fromDate){
     const startAt=`${addDays(SEASON_BASE, Math.max(0,nseq-1))}T00:00:00`; // 2020-01-01 + (숫자-1)일 → 커지면 월 넘어감
     const days0=arr[0].days; if(arr.some(b=>b.days!==days0)) durWarn.push(key);
     const fdef=defOf(arr[0]);
+    // 등록차단·마지막그룹채움: 프리셋(매트릭스) 값이 있으면 그걸, 비어있으면 고정값 기본값
+    const rbStr=(fdef&&fdef.regBlockMin!=null)?String(fdef.regBlockMin).trim():"";
+    const regBlockedMin=(rbStr!=="" && !isNaN(parseInt(rbStr,10))) ? parseInt(rbStr,10) : (parseInt(def.RegisterBlockedMin,10)||0);
+    const flStr=(fdef&&fdef.fillLastGroup!=null)?String(fdef.fillLastGroup):"";
+    const fillLast=(flStr==="1"||flStr==="0") ? (flStr==="1") : !!def.FillInLastGroupAfterRegisterBlockedMin;
     sched.push({
       SeasonSetting:{ StartAt:startAt, EndAt:FIXED_END, PeriodUnit:6, PeriodValue:days0, IrregularPeriodMinutes:null, CustomSeasonDatas:seasons },
       MaxEntryGroupSize:def.MaxEntryGroupSize, RewardClaimableSeasonCount:def.RewardClaimableSeasonCount, RewardDurationMin:def.RewardDurationMin,
       SeparateByUserTags:def.SeparateByUserTags, NoWindow:def.NoWindow, IsRelationShipContent:def.IsRelationShipContent,
       ActiveRankBoardRegister:def.ActiveRankBoardRegister, SetScoreType:def.SetScoreType, FreezeProfileCache:def.FreezeProfileCache,
+      RegisterBlockedMin:regBlockedMin, FillInLastGroupAfterRegisterBlockedMin:fillLast,
       CategoryIds:def.CategoryIds, Description:((fdef&&fdef.name)||barName(arr[0])), CreatedAt:nowISO,
       EType:"TournamentContent", PK, PKObj:{GameTitle:def.GameTitle}, SK:cid, SKObj:{ContentId:cid}, TTL:null, UK:`${PK}|${cid}`
     });
@@ -1622,6 +1640,8 @@ function fillTourneyForm(){ const d=state.tourneyDefaults||defaultTourneyDefault
   document.getElementById("tn_rel").checked=!!d.IsRelationShipContent;
   document.getElementById("tn_rank").checked=!!d.ActiveRankBoardRegister;
   document.getElementById("tn_freeze").checked=!!d.FreezeProfileCache;
+  document.getElementById("tn_regblock").value=(d.RegisterBlockedMin==null?0:d.RegisterBlockedMin);
+  document.getElementById("tn_filllast").value=(d.FillInLastGroupAfterRegisterBlockedMin?"1":"0");
   document.getElementById("tn_base").value=state.tourneyBase||"";
   document.getElementById("tn_from").value=state.tourneyFromDate||"";
   document.getElementById("tn_status").textContent="";
@@ -1638,6 +1658,8 @@ function readTourneyForm(){
     GameTitle:(document.getElementById("tn_game").value.trim())||"idc",
     SetScoreType:parseInt(document.getElementById("tn_score").value,10)||0,
     PeriodUnit:6, // 스케쥴 토너 = 항상 Custom(6)
+    RegisterBlockedMin:parseInt(document.getElementById("tn_regblock").value,10)||0,
+    FillInLastGroupAfterRegisterBlockedMin:document.getElementById("tn_filllast").value==="1",
     NoWindow:document.getElementById("tn_nowin").checked,
     IsRelationShipContent:document.getElementById("tn_rel").checked,
     ActiveRankBoardRegister:document.getElementById("tn_rank").checked,
