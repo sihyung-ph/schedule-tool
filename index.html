@@ -644,7 +644,7 @@ function renderInner(){
     html += `<div class="day-header"><div class="corner">트랙 \\ 날짜</div><div class="day-cells">`;
     for (let i=startDay;i<=endDay;i++){ const d=dayToDate(i); const isT=iso(d)===today; const w=d.getUTCDay();
       const cls=(isWeekend(d)?" weekend":"")+(d.getUTCDate()===1?" month1":"")+(isT?" today":"")+(w===6?" sat":"")+(w===0?" sun":"");
-      html += `<div class="day-cell${cls}"><div class="dnum">${d.getUTCDate()}</div><div class="dow">${DOW_KO[w]}</div><div class="ddate">${d.getUTCMonth()+1}월</div></div>`; }
+      html += `<div class="day-cell${cls}"><div class="dnum">${d.getUTCDate()}</div><div class="dow">${DOW_KO[w]}</div><div class="ddate">${d.getUTCMonth()+1}月</div></div>`; }
     html += `</div></div>`;
     if (!types.length) html += `<div style="padding:14px;color:#bbb">정의를 추가하면 트랙이 생깁니다.</div>`;
     const bodyH = types.reduce((a,t)=>a+trackHeight(t),0);
