@@ -61,14 +61,15 @@
   .corner { flex: 0 0 var(--label-w); width: var(--label-w); background: #e7e9ee; border-right: 1px solid #c4c8cd; display: flex; align-items: center; justify-content: center; font-weight: 600; color:#555; position: sticky; left:0; z-index:5; }
   .day-cells { display: flex; }
   .day-cell { flex: 0 0 var(--day-w); width: var(--day-w); text-align: center; border-right: 1px solid #e2e4e8; padding: 2px 0; }
-  .day-cell .dnum { font-weight: 600; }
-  .day-cell .ddate { font-size: 9px; color: #999; }
+  .day-cell .dnum { font-weight: 600; line-height: 1.15; }
+  .day-cell .dow { font-size: 10px; font-weight: 700; color: #7a8290; line-height: 1.1; }
+  .day-cell .ddate { font-size: 11px; font-weight: 600; color: #8b929c; line-height: 1.15; }
   .day-cell.weekend { background: #fafbe9; }
   .day-cell.month1 { border-left: 2px solid #b9bdc4; }
   .day-cell.month1 .dnum { font-weight: 900; }
-  .day-cell.month1 .ddate { color:#555; font-weight:700; }
-  .day-cell.sat .dnum { color: #2d6cdf; }
-  .day-cell.sun .dnum { color: #d6313b; }
+  .day-cell.month1 .ddate { color:#444; font-weight:800; }
+  .day-cell.sat .dnum, .day-cell.sat .dow { color: #2d6cdf; }
+  .day-cell.sun .dnum, .day-cell.sun .dow { color: #d6313b; }
   .day-cell.today { background: #ffe08a; box-shadow: inset 0 0 0 2px #f5a623; }
   .day-cell.today .dnum { color:#b8740a; }
   .today-stripe { position:absolute; top:0; bottom:0; width:2px; background:#f5a623; z-index:3; pointer-events:none; }
@@ -250,8 +251,6 @@
       <div class="meta">오프라인 클라 테스트용 <b>슬림 JSON</b>. 대상 = 트랙 <b>토너먼트</b> + 📤 추출설정에서 <b>토너먼트 운영툴</b> 체크 + <b>토너 DefKey</b> 입력된 막대. 고정 베이스는 <b>포함 안 함</b>.</div>
       <div class="row"><label>이 날짜부터</label><input id="off_from" type="date"></div>
       <div class="meta">비우면 전체. 지정 시 <b>시작일이 이 날짜 이후(포함)</b>인 막대만 시즌에 포함.</div>
-      <div class="row"><label>보상시간(분)</label><input id="off_rdm" type="text" disabled></div>
-      <div class="meta">각 레코드의 <code>rewardDurationMin</code> — 값 변경은 「📋 토너먼트 추출 → 고정값 설정」에서.</div>
       <div class="tnlbl" style="margin-top:10px">미리보기</div>
       <div id="off_list" style="max-height:38vh;overflow:auto;border:1px solid #e0e3e8;border-radius:8px;margin:6px 0;background:#fff"></div>
       <div class="meta" id="off_status" style="min-height:14px"></div>
@@ -491,6 +490,7 @@ function barName(b){ return b.labelOverride || (defOf(b)||{}).name || "스케쥴
 function isDimmed(type){ return (state.dimmedTypes||[]).includes(type); }
 function typeColor(type){ const d=state.definitions.find(d=>d.eventType===type); return d?d.color:"#c4c8cd"; }
 const TYPE_CODE={ "토너먼트":"T", "라이브이벤트":"E", "가챠부스트":"G", "게임부스트":"B", "드랍부스트":"D" };
+const DOW_KO=["일","월","화","수","목","금","토"]; // getUTCDay() 인덱스
 // 고정 배치 규칙: 매일 최소 개수
 const COVERAGE_RULES = [ {eventType:"라이브이벤트", min:1}, {eventType:"토너먼트", min:1} ];
 // 추출 유형 (프리셋이 어떤 운영 대상에 포함되는지)
@@ -644,7 +644,7 @@ function renderInner(){
     html += `<div class="day-header"><div class="corner">트랙 \\ 날짜</div><div class="day-cells">`;
     for (let i=startDay;i<=endDay;i++){ const d=dayToDate(i); const isT=iso(d)===today; const w=d.getUTCDay();
       const cls=(isWeekend(d)?" weekend":"")+(d.getUTCDate()===1?" month1":"")+(isT?" today":"")+(w===6?" sat":"")+(w===0?" sun":"");
-      html += `<div class="day-cell${cls}"><div class="dnum">${d.getUTCDate()}</div><div class="ddate">${d.getUTCMonth()+1}월</div></div>`; }
+      html += `<div class="day-cell${cls}"><div class="dnum">${d.getUTCDate()}</div><div class="dow">${DOW_KO[w]}</div><div class="ddate">${d.getUTCMonth()+1}월</div></div>`; }
     html += `</div></div>`;
     if (!types.length) html += `<div style="padding:14px;color:#bbb">정의를 추가하면 트랙이 생깁니다.</div>`;
     const bodyH = types.reduce((a,t)=>a+trackHeight(t),0);
@@ -1694,7 +1694,6 @@ let offRes=null;
 function offCalc(){
   const def=state.tourneyDefaults||defaultTourneyDefaults();
   const from=document.getElementById("off_from").value||"";
-  document.getElementById("off_rdm").value=(def.RewardDurationMin==null?"":def.RewardDurationMin);
   offRes=buildOfflineTournamentJSON(def, from);
   const list=document.getElementById("off_list");
   if(!offRes.count){
