@@ -113,6 +113,13 @@
   #tn_verify ul { margin:4px 0 0; padding-left:18px; max-height:22vh; overflow:auto; }
   #tn_verify li { margin:2px 0; line-height:1.45; }
   #tn_verify code { background:rgba(0,0,0,.06); padding:0 4px; border-radius:3px; }
+  .vinfo-sec { margin:12px 0; font-size:12.5px; line-height:1.55; }
+  .vinfo-h { font-weight:800; font-size:13px; margin-bottom:5px; color:#2a2f36; }
+  .vinfo-h.bad { color:#a3212a; } .vinfo-h.warn { color:#8a6a12; } .vinfo-h.ok { color:#136c47; }
+  .vinfo-t { width:100%; border-collapse:collapse; }
+  .vinfo-t td { border:1px solid #e6e8ec; padding:6px 9px; vertical-align:top; }
+  .vinfo-t td:first-child { white-space:nowrap; background:#f7f8fa; width:150px; }
+  #vinfoDlg code { background:rgba(0,0,0,.06); padding:0 4px; border-radius:3px; }
   #verList .verrow, #dv_list .verrow, #off_list .verrow { display:flex; justify-content:space-between; gap:10px; padding:9px 12px; cursor:pointer; border-bottom:1px solid #eef0f3; font-size:13px; align-items:center; }
   #verList .verrow:hover, #dv_list .verrow:hover { background:#eef5ff; }
   #verList .verrow .vn, #dv_list .verrow .vn, #off_list .verrow .vn { font-weight:600; color:#2a2f36; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
@@ -254,6 +261,45 @@
     </form>
   </dialog>
 
+  <dialog id="vinfoDlg">
+    <form method="dialog" class="dlg" style="width:min(94vw,720px);max-height:88vh;overflow:auto">
+      <h3>ℹ 라이브 검증 — 무엇을 확인하나</h3>
+      <div class="meta">운영툴 임포트는 ContentId 레코드를 <b>통째로 교체</b>합니다. 그래서 이미 서비스 중인 시즌이 사라지거나 바뀌면 사고가 납니다. 이 검증은 그 사고를 추출 전에 잡습니다.</div>
+
+      <div class="vinfo-sec"><div class="vinfo-h">기준: “도래한 시즌”</div>
+        <div><b>시작일 ≤ 오늘</b>(<span id="vi_today"></span>)인 시즌 = 이미 시작했거나 끝난 시즌 → <b>절대 불변</b>.<br>시작일이 미래인 시즌 = 변경·삭제·추가 <b>모두 자유</b>.</div></div>
+
+      <div class="vinfo-sec"><div class="vinfo-h bad">❌ 위반 — 추출 시 확인창으로 막습니다</div>
+        <table class="vinfo-t">
+          <tr><td><b>도래 시즌 삭제</b></td><td>운영툴의 도래한 시즌이 이번 추출에 없음 → 임포트하면 진행/종료된 시즌 기록이 사라짐</td></tr>
+          <tr><td><b>도래 시즌 기간 변경</b></td><td>시작일은 같은데 종료일이 다름 → 진행 중인 시즌의 기간이 바뀜</td></tr>
+          <tr><td><b>과거 시즌 추가</b></td><td>이미 지난 날짜로 시즌을 새로 만듦 (운영툴엔 없던 것) → “뒤에만 추가” 규칙 위반</td></tr>
+          <tr><td><b>컨텐츠 누락</b></td><td>도래한 시즌을 가진 ContentId 가 이번 추출에 아예 없음 → 그 토너의 라이브 기록 소실</td></tr>
+        </table></div>
+
+      <div class="vinfo-sec"><div class="vinfo-h warn">⚠ 참고 — 허용되지만 알려줍니다</div>
+        <table class="vinfo-t">
+          <tr><td><b>미래 시즌 변동</b></td><td>미래 시즌 개수가 달라짐 (정상적인 스케쥴 편집)</td></tr>
+          <tr><td><b>신규 컨텐츠</b></td><td>운영툴에 없던 새 ContentId 가 추가됨</td></tr>
+          <tr><td><b>설정값 변경</b></td><td>기존 컨텐츠의 설정이 운영툴과 달라짐 — 필드별로 <code>운영툴 값 → 추출 값</code> 표시 (MaxEntryGroupSize·RewardDurationMin·CategoryIds·RegisterBlockedMin·Description·SeasonSetting 등)</td></tr>
+          <tr><td><b>이번 추출에 없음</b></td><td>도래한 시즌이 없는 컨텐츠가 빠짐 → 영향 없음</td></tr>
+        </table></div>
+
+      <div class="vinfo-sec"><div class="vinfo-h">검증하지 않는 것</div>
+        <div>· <b>고정 베이스</b>(클랜 등 <code>CustomSeasonDatas: null</code>) — 붙여넣은 값이 그대로 통과하므로 비교 대상 아님<br>
+             · <b>시즌 시각(시·분)</b> — 편집기는 자정 기준 날짜 단위라 <b>날짜만</b> 비교<br>
+             · 운영툴 JSON 을 안 붙여넣으면 검증 자체가 불가 (추출 시 경고만 뜸)</div></div>
+
+      <div class="vinfo-sec"><div class="vinfo-h ok">✅ 안전하게 쓰는 법</div>
+        <div>1. 운영툴 [토너먼트 &gt; 데이터 추출]에서 <b>현재 JSON 전체</b>를 복사해 붙여넣기<br>
+             2. <b>「기존 컨텐츠 설정 상속」 켜두기</b> — 기존 토너의 설정값은 운영툴 값을 유지하고 시즌만 갱신<br>
+             3. 결과가 <b>초록(위반 없음)</b> 인지 확인 후 추출<br>
+             4. ⚠️ <b>「이 날짜부터」 필터 주의</b> — 미래 날짜로 걸면 과거 시즌이 추출에서 빠져 라이브가 깨집니다 (이 검증이 잡아줌)</div></div>
+
+      <div class="actions"><div></div><div class="right"><button type="button" class="primary" id="vi_close">닫기</button></div></div>
+    </form>
+  </dialog>
+
   <dialog id="driveDlg">
     <form method="dialog" class="dlg" style="width:min(94vw,660px)">
       <h3 id="dv_title">☁ Drive 열기</h3>
@@ -363,7 +409,7 @@
         <div><button type="button" id="tn_offcopy">📋 오프라인 JSON 복사</button></div>
       </details>
       <div class="meta" id="tn_status" style="min-height:16px"></div>
-      <div class="actions"><div><button type="button" id="tn_check">🔍 라이브 검증</button></div><div class="right"><button type="button" id="tn_cancel">취소</button><button type="button" class="primary" id="tn_ok">추출(복사)</button></div></div>
+      <div class="actions"><div><button type="button" id="tn_check">🔍 라이브 검증</button> <button type="button" id="tn_info" title="이 검증이 무엇을 확인하는지 보기">ℹ 검증 항목</button></div><div class="right"><button type="button" id="tn_cancel">취소</button><button type="button" class="primary" id="tn_ok">추출(복사)</button></div></div>
     </form>
   </dialog>
 
@@ -1817,6 +1863,9 @@ function runTourneyVerify(){
   return v;
 }
 document.getElementById("tn_check").addEventListener("click",runTourneyVerify);
+const vinfoDlg=document.getElementById("vinfoDlg");
+document.getElementById("tn_info").addEventListener("click",()=>{ document.getElementById("vi_today").textContent=todayISO(); if(!vinfoDlg.open) vinfoDlg.showModal(); });
+document.getElementById("vi_close").addEventListener("click",()=>vinfoDlg.close());
 document.getElementById("tn_inherit").addEventListener("change",()=>{ persistTourneyForm(); runTourneyVerify(); if(document.getElementById("tn_offbox").open) offCalc(); });
 document.getElementById("tn_base").addEventListener("change",runTourneyVerify);
 document.getElementById("tn_from").addEventListener("change",()=>{ runTourneyVerify(); if(document.getElementById("tn_offbox").open) offCalc(); });
