@@ -419,6 +419,7 @@
         <textarea id="cl_base" placeholder="EventSchedule_1_1&#9;EventSchedule&#9;1&#9;1&#9;…   (시트에서 탭 구분 행 그대로 붙여넣기)"></textarea>
       </div>
       <div id="cl_verify" style="margin:8px 0;font-size:12px"></div>
+      <div class="meta" style="margin:8px 0 0">📁 백업 폴더: <b class="bkname">확인 중…</b> <button type="button" class="bkpick">변경</button><br>복사할 때마다 <code>날짜_시각_편집본이름</code> 폴더를 만들어 <b>추출값 + 편집본 전체 상태</b>를 남깁니다.</div>
       <div class="actions"><div><button type="button" id="cl_check">🔍 라이브 검증</button> <button type="button" id="cl_info" title="이 검증이 무엇을 확인하는지 보기">ℹ 검증 항목</button></div><div class="right"><button type="button" id="cl_cancel">취소</button><button type="button" class="primary" id="cl_ok">복사</button></div></div>
     </form>
   </dialog>
@@ -465,6 +466,7 @@
         <div><button type="button" id="tn_offcopy">📋 오프라인 JSON 복사</button></div>
       </details>
       <div class="meta" id="tn_status" style="min-height:16px"></div>
+      <div class="meta" style="margin:8px 0 0">📁 백업 폴더: <b class="bkname">확인 중…</b> <button type="button" class="bkpick">변경</button><br>추출할 때마다 <code>날짜_시각_편집본이름</code> 폴더를 만들어 <b>추출값 + 편집본 전체 상태</b>를 남깁니다.</div>
       <div class="actions"><div><button type="button" id="tn_check">🔍 라이브 검증</button> <button type="button" id="tn_info" title="이 검증이 무엇을 확인하는지 보기">ℹ 검증 항목</button></div><div class="right"><button type="button" id="tn_cancel">취소</button><button type="button" class="primary" id="tn_ok">추출(복사)</button></div></div>
     </form>
   </dialog>
@@ -541,6 +543,21 @@
         <div class="right"><button type="button" id="d_cancel">취소</button><button type="button" class="primary" id="d_ok">저장</button></div>
       </div>
     </form>
+  </dialog>
+
+  <dialog id="startDlg">
+    <div class="dlg" style="width:min(94vw,430px)">
+      <h3>무엇을 열까요?</h3>
+      <div class="meta" style="margin:-6px 0 12px">브라우저에 남아 있던 마지막 상태로 그냥 시작하면 어느 편집본인지 헷갈립니다. 여기서 고르세요.</div>
+      <div id="st_resume_box" style="margin-bottom:8px">
+        <button type="button" class="primary" id="st_resume" style="width:100%;text-align:left;padding:10px 12px">▶ 이어서 작업<br><span id="st_resume_info" style="font-weight:400;font-size:11px;opacity:.85"></span></button>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <button type="button" id="st_file" style="text-align:left;padding:9px 12px">📂 편집본 파일 열기<span style="font-size:11px;color:#888"> — 로컬 .json</span></button>
+        <button type="button" id="st_drive" style="text-align:left;padding:9px 12px">☁ Drive 에서 열기<span style="font-size:11px;color:#888"> — 공유된 편집본</span></button>
+        <button type="button" id="st_new" style="text-align:left;padding:9px 12px">✨ 새로 시작<span style="font-size:11px;color:#888"> — 빈 스케쥴 (지금 남아 있는 작업은 지워집니다)</span></button>
+      </div>
+    </div>
   </dialog>
 
 <script>
@@ -1246,7 +1263,7 @@ function exportSchedule(){
 // TSV 내보내기 비활성 (exportSchedule 함수는 차후 재사용 위해 보존)
 
 // 저장/불러오기
-function save(){ localStorage.setItem("scheduleToolV3", JSON.stringify({state,nextId})); }
+function save(){ localStorage.setItem("scheduleToolV3", JSON.stringify({state,nextId,savedAt:Date.now()})); }
 function validState(s){ return s && Array.isArray(s.definitions) && Array.isArray(s.bars); }
 function migrate(){ // 부스트 → 가챠부스트 (타입 분리 이전 데이터)
   state.definitions.forEach(d=>{ if(d.eventType==="부스트") d.eventType="가챠부스트"; });
@@ -1275,7 +1292,8 @@ function defaultTourneyDefaults(){ return {
   SetScoreType:0, FreezeProfileCache:false, PeriodUnit:2, GameTitle:"idc",
   RegisterBlockedMin:0, FillInLastGroupAfterRegisterBlockedMin:false, InheritLive:true   // 기본값 — 매트릭스에서 프리셋별 override 가능
 }; }
-function load(){ const raw=localStorage.getItem("scheduleToolV3"); if(raw){ try{ const o=JSON.parse(raw); if(!validState(o.state))return false; state=Object.assign({daysPerRow:60},o.state); if(!state.daysPerRow)state.daysPerRow=60; nextId=o.nextId||1; migrate(); return true; }catch(e){console.warn(e);} } return false; }
+let lastSavedAt=0;
+function load(){ const raw=localStorage.getItem("scheduleToolV3"); if(raw){ try{ const o=JSON.parse(raw); if(!validState(o.state))return false; state=Object.assign({daysPerRow:60},o.state); if(!state.daysPerRow)state.daysPerRow=60; nextId=o.nextId||1; lastSavedAt=o.savedAt||0; migrate(); return true; }catch(e){console.warn(e);} } return false; }
 // ===== 파일 저장/열기 (경로 선택 — File System Access API, 미지원 시 다운로드/파일선택 폴백) =====
 async function saveFile(suggestedName, text){
   if(window.showSaveFilePicker){
@@ -1548,6 +1566,49 @@ document.getElementById("verList").addEventListener("click",async e=>{
   const f=verFiles[+row.dataset.i]; if(!f) return;
   try{ const file=await f.handle.getFile(); const txt=await file.text(); verDlg.close(); loadProjectText(txt); updSaveStatus("☁ "+f.name); }
   catch(err){ alert("열기 실패: "+err.message); }
+});
+
+// ===== 추출값 백업 (Backup 폴더 안에 버전별 서브폴더) =====
+// 추출할 때마다 「날짜_시각_편집본이름」 폴더를 만들고 결과물 + 편집본 전체 상태를 남긴다.
+// 사고가 나면 운영툴에 실제로 넣은 값을 그대로 대조할 수 있어야 하므로, 클립보드에 복사한 것과 같은 값을 쓴다.
+let backupDir=null;
+const backupSupported=()=>!!window.showDirectoryPicker;
+function safeName(s){ return String(s||"").replace(/[\/\\:*?"<>|]/g,"_").trim(); }
+function curFileLabel(){ const n=driveFile?driveFile.name:(projHandle?projHandle.name:""); return safeName(String(n||"").replace(/\.json$/i,"")); }
+function backupFolderName(){ const l=curFileLabel(); return fmtStamp()+(l?"_"+l:""); }
+async function getBackupDir(forcePick){
+  if(!backupSupported()) throw new Error("이 브라우저는 폴더 접근 미지원 — Chrome/Edge 를 쓰세요.");
+  if(!forcePick){
+    if(!backupDir){ try{ backupDir=await idbGet("backupDir"); }catch(_){} }
+    if(backupDir){ try{ if(await ensurePerm(backupDir)) return backupDir; }catch(_){} }
+  }
+  backupDir=await window.showDirectoryPicker({mode:"readwrite"});
+  try{ await idbSet("backupDir",backupDir); }catch(_){}
+  if(!(await ensurePerm(backupDir))) throw new Error("폴더 권한 거부됨");
+  updBackupLabels(); return backupDir;
+}
+function updBackupLabels(){
+  const t = !backupSupported() ? "미지원 브라우저" : (backupDir ? backupDir.name : "미지정 (첫 추출 때 폴더를 고르게 됩니다)");
+  document.querySelectorAll(".bkname").forEach(el=>el.textContent=t);
+}
+(async()=>{ try{ backupDir=await idbGet("backupDir")||null; }catch(_){} updBackupLabels(); })();
+// files = [{name, text}]. 편집본 전체 상태는 항상 같이 저장. 실패해도 추출(클립보드 복사) 자체는 막지 않는다.
+// ⚠️ 폴더 피커·권한 재요청은 **사용자 제스처**를 요구한다. 그래서 이 함수는 클립보드 복사보다 **먼저**,
+//    클릭 핸들러에서 최대한 이른 시점에 불러야 한다 (await 를 여러 번 거치면 제스처가 만료돼 피커가 거부됨).
+async function backupExtract(files){
+  if(!backupSupported()) return {ok:false, reason:"이 브라우저는 폴더 백업 미지원 (Chrome/Edge 필요)"};
+  let dir; try{ dir=await getBackupDir(false); }
+  catch(e){ return {ok:false, reason:(e.name==="AbortError"?"폴더 선택 취소":e.message)+" — 창의 「📁 백업 폴더 · 변경」으로 지정하세요"}; }
+  const folder=backupFolderName();
+  try{
+    const sub=await dir.getDirectoryHandle(folder,{create:true});
+    const all=files.concat([{name:"editor-state.json", text:snapshot()}]);
+    for(const f of all){ const fh=await sub.getFileHandle(f.name,{create:true}); const w=await fh.createWritable(); await w.write(f.text); await w.close(); }
+    return {ok:true, folder, count:all.length};
+  }catch(e){ return {ok:false, reason:e.message}; }
+}
+document.addEventListener("click",e=>{ const b=e.target.closest(".bkpick"); if(!b) return;
+  e.preventDefault(); getBackupDir(true).catch(err=>{ if(err.name!=="AbortError") alert("백업 폴더 지정 실패: "+err.message); });
 });
 
 // ===== 스케쥴 데이터(배치된 스케쥴만) 내보내기/가져오기 =====
@@ -1826,7 +1887,7 @@ document.getElementById("cl_useEnd").addEventListener("change",e=>{ document.get
 document.getElementById("cl_start").addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); document.getElementById("cl_ok").click(); } });
 document.getElementById("cl_idx").addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); document.getElementById("cl_ok").click(); } });
 document.getElementById("cl_cancel").addEventListener("click",()=>copyLiveDlg.close());
-document.getElementById("cl_ok").addEventListener("click",()=>{
+document.getElementById("cl_ok").addEventListener("click",async()=>{
   const {gs, iStart, from, useEnd, manualTo, to}=readLiveForm();   // to = 편집툴 끝날 or 수동
   state.liveGroupStart=gs; state.liveIndexStart=iStart; state.liveFromDate=from; state.liveToDate=manualTo; state.liveUseEnd=useEnd;
   state.liveBase=document.getElementById("cl_base").value; save();
@@ -1840,7 +1901,11 @@ document.getElementById("cl_ok").addEventListener("click",()=>{
     if(!confirm(`❌ 라이브 훼손 위반 ${v.violations.length}건이 있습니다. 이대로 시트에 붙여넣으면 서비스 데이터가 깨집니다.\n\n${lines}${v.violations.length>8?"\n… 나머지는 창의 검증 결과 참고":""}\n\n그래도 복사할까요?`)) return;
   }
   copyLiveDlg.close();
-  copyText(tsv).then(()=>alert(`라이브 테이블 ${tsv.split("\r\n").length}행 복사됨 (그룹 ${gs}/인덱스 ${iStart}부터${from?`, ${from} 이후`:""}${to?`, ${to} 이전`:""}${useEnd?" [편집툴 끝날]":""}) — 구글시트에 붙여넣기(Ctrl+V).`)).catch(e=>alert("복사 실패: "+e.message));
+  const bk=await backupExtract([{name:"live-table.tsv", text:tsv}]);   // 복사보다 먼저 (제스처 유효구간)
+  copyText(tsv).then(()=>{
+    alert(`라이브 테이블 ${tsv.split("\r\n").length}행 복사됨 (그룹 ${gs}/인덱스 ${iStart}부터${from?`, ${from} 이후`:""}${to?`, ${to} 이전`:""}${useEnd?" [편집툴 끝날]":""}) — 구글시트에 붙여넣기(Ctrl+V).`
+      +(bk.ok?`\n\n📁 백업: ${bk.folder}/ (${bk.count}개 파일)`:`\n\n⚠ 백업 안 됨: ${bk.reason}`));
+  }).catch(e=>alert("복사 실패: "+e.message));
 });
 // ===== 토너먼트 운영툴용 JSON 추출 (고정 베이스 + 스케쥴 토너) =====
 function pad2(n){ return String(n).padStart(2,"0"); }
@@ -2052,12 +2117,14 @@ function offCalc(){
   if(offRes.noKey.length) st+=` · ⚠ DefKey 미입력 제외 ${offRes.noKey.length}건: ${offRes.noKey.join(", ")}`;
   document.getElementById("tn_offinfo").textContent=st;
 }
-document.getElementById("tn_offcopy").addEventListener("click",()=>{
+document.getElementById("tn_offcopy").addEventListener("click",async()=>{
   offCalc();
   if(!offRes||!offRes.count){ document.getElementById("tn_offinfo").textContent="복사할 대상이 없습니다."; return; }
   const json=JSON.stringify(offRes.records,null,2);
+  const bk=await backupExtract([{name:"tournament-offline.json", text:json}]);   // 복사보다 먼저 (제스처 유효구간)
   copyText(json).then(()=>{
     let msg=`오프라인 토너 JSON ${offRes.count}종 (시즌 ${offRes.seasonTotal}개) 복사됨. 붙여넣기(Ctrl+V).`;
+    msg+=bk.ok?`\n\n📁 백업: ${bk.folder}/ (${bk.count}개 파일)`:`\n\n⚠ 백업 안 됨: ${bk.reason}`;
     if(offRes.noKey.length) msg+=`\n\n⚠ 토너 DefKey 미입력 제외 ${offRes.noKey.length}건: ${offRes.noKey.join(", ")}`;
     alert(msg);
   }).catch(e=>{ document.getElementById("tn_offinfo").textContent="복사 실패: "+e.message; });
@@ -2097,7 +2164,7 @@ document.getElementById("tn_inherit").addEventListener("change",()=>{ persistTou
 document.getElementById("tn_base").addEventListener("change",runTourneyVerify);
 document.getElementById("tn_from").addEventListener("change",()=>{ runTourneyVerify(); if(document.getElementById("tn_offbox").open) offCalc(); });
 document.getElementById("tn_cancel").addEventListener("click",()=>{ persistTourneyForm(); tourneyDlg.close(); });
-document.getElementById("tn_ok").addEventListener("click",()=>{
+document.getElementById("tn_ok").addEventListener("click",async()=>{
   const def=readTourneyForm();
   const from=document.getElementById("tn_from").value||"";
   persistTourneyForm();
@@ -2111,9 +2178,11 @@ document.getElementById("tn_ok").addEventListener("click",()=>{
     if(!confirm(`❌ 라이브 훼손 위반 ${v.violations.length}건이 있습니다. 이대로 운영툴에 임포트하면 서비스 데이터가 깨집니다.\n\n${lines}${v.violations.length>8?"\n… 나머지는 창의 검증 결과 참고":""}\n\n그래도 추출할까요?`)) return;
   }
   const json=JSON.stringify(res.records,null,2);
+  tourneyDlg.close();
+  const bk=await backupExtract([{name:"tournament.json", text:json}]);   // 복사보다 먼저 (제스처 유효구간)
   copyText(json).then(()=>{
-    tourneyDlg.close();
     let msg=`토너먼트 JSON ${res.records.length}건 복사됨 (베이스 ${res.baseCount} + 토너 ${res.typeCount}종 / 시즌 ${res.seasonTotal}개${res.keptTotal?` + 기존 유지 ${res.keptTotal}개`:""}). 운영툴 임포트칸에 Ctrl+V.`;
+    msg+=bk.ok?`\n\n📁 백업: ${bk.folder}/ (${bk.count}개 파일)`:`\n\n⚠ 백업 안 됨: ${bk.reason}`;
     if(res.durWarn.length) msg+=`\n\n⚠ 시즌마다 기간이 다른 DefKey(첫 막대 기간으로 PeriodValue 설정됨): ${res.durWarn.join(", ")}`;
     if(res.noKey.length) msg+=`\n\n⚠ 토너 DefKey 미입력으로 제외된 막대 ${res.noKey.length}건: ${res.noKey.join(", ")}`;
     alert(msg);
@@ -2235,8 +2304,36 @@ function seed(){
 }
 
 function syncToolbar(){ document.getElementById("startDate").value=state.startDate; document.getElementById("totalDays").value=state.totalDays; document.getElementById("daysPerRow").value=state.daysPerRow; document.getElementById("dayWidth").value=state.dayWidth; document.getElementById("groupWin").value=state.groupWindowDays; }
-if(!load()) seed();
+const hadSaved=load();
+if(!hadSaved) seed();
 syncToolbar(); renderPalette(); render(); updHistBtns();
+
+// ===== 시작 화면 — 무엇을 열지 고르게 한다 =====
+// 예전엔 localStorage 의 마지막 상태를 조용히 복원해서, 어느 편집본인지 모르는 채 옛 데이터로 작업하는 사고가 있었다.
+// 파일을 실제로 다시 읽는 건 아니므로(핸들만 기억), 여기서 명시적으로 고르게 하는 게 유일한 방어다.
+const startDlg=document.getElementById("startDlg");
+function resumeLabel(){
+  const nm=driveFile?("☁ "+driveFile.name):(projHandle?("● "+projHandle.name):"파일 연결 없음 (브라우저 저장분)");
+  const when=lastSavedAt?new Date(lastSavedAt).toLocaleString():"시각 기록 없음";
+  return `${nm} · 마지막 편집 ${when} · 스케쥴 ${(state.bars||[]).length}개`;
+}
+function openStartDlg(){
+  document.getElementById("st_resume_box").style.display=hadSaved?"":"none";
+  if(hadSaved) document.getElementById("st_resume_info").textContent=resumeLabel();
+  if(!startDlg.open) startDlg.showModal();
+}
+document.getElementById("st_resume").addEventListener("click",()=>startDlg.close());
+document.getElementById("st_file").addEventListener("click",()=>{ startDlg.close(); localOpenProj(); });
+document.getElementById("st_drive").addEventListener("click",()=>{ startDlg.close(); openDriveBrowser("open"); });
+document.getElementById("st_new").addEventListener("click",()=>{
+  if(hadSaved && !confirm("빈 스케쥴로 시작합니다. 지금 브라우저에 남아 있는 작업은 지워집니다.\n(필요하면 취소하고 '이어서 작업' → 💾 로 저장하세요)")) return;
+  startDlg.close();
+  seed(); selectedSet=new Set(); selectedId=null; undoStack.length=0; redoStack.length=0;
+  projHandle=null; driveFile=null; try{ localStorage.removeItem("driveCur"); }catch(_){}
+  updSaveStatus(""); save(); syncToolbar(); renderPalette(); render(); updHistBtns();
+});
+// 핸들 복원(IndexedDB·비동기)이 끝난 뒤 열어야 파일 이름이 제대로 표시된다
+setTimeout(openStartDlg, 120);
 </script>
 <script async defer src="https://accounts.google.com/gsi/client"></script>
 </body>
