@@ -105,21 +105,21 @@
   #imgDlg .img-preview-wrap { flex:1; min-height:200px; max-height:66vh; overflow:auto; border:1px solid #e0e3e8; border-radius:10px; background:#f6f8fa; display:flex; align-items:center; justify-content:center; padding:10px; margin:8px 0; }
   #imgDlg .img-preview-wrap img { max-width:100%; display:block; box-shadow:0 2px 10px rgba(0,0,0,.12); border-radius:6px; }
   #imgDlg .actions button { padding:8px 16px; font-size:13px; }
-  #tn_verify .vbox { border-radius:8px; padding:9px 11px; border:1px solid; }
-  #tn_verify .vbox.ok { background:#eaf7f0; border-color:#a9dcc5; color:#136c47; }
-  #tn_verify .vbox.bad { background:#fdecec; border-color:#f0b4b4; color:#a3212a; }
-  #tn_verify .vbox.warn { background:#fff8e6; border-color:#f0dca4; color:#8a6a12; }
-  #tn_verify .vhead { font-weight:800; margin-bottom:5px; }
-  #tn_verify ul { margin:4px 0 0; padding-left:18px; max-height:22vh; overflow:auto; }
-  #tn_verify li { margin:2px 0; line-height:1.45; }
-  #tn_verify code { background:rgba(0,0,0,.06); padding:0 4px; border-radius:3px; }
+  #tn_verify .vbox, #cl_verify .vbox { border-radius:8px; padding:9px 11px; border:1px solid; }
+  #tn_verify .vbox.ok, #cl_verify .vbox.ok { background:#eaf7f0; border-color:#a9dcc5; color:#136c47; }
+  #tn_verify .vbox.bad, #cl_verify .vbox.bad { background:#fdecec; border-color:#f0b4b4; color:#a3212a; }
+  #tn_verify .vbox.warn, #cl_verify .vbox.warn { background:#fff8e6; border-color:#f0dca4; color:#8a6a12; }
+  #tn_verify .vhead, #cl_verify .vhead { font-weight:800; margin-bottom:5px; }
+  #tn_verify ul, #cl_verify ul { margin:4px 0 0; padding-left:18px; max-height:22vh; overflow:auto; }
+  #tn_verify li, #cl_verify li { margin:2px 0; line-height:1.45; }
+  #tn_verify code, #cl_verify code { background:rgba(0,0,0,.06); padding:0 4px; border-radius:3px; }
   .vinfo-sec { margin:12px 0; font-size:12.5px; line-height:1.55; }
   .vinfo-h { font-weight:800; font-size:13px; margin-bottom:5px; color:#2a2f36; }
   .vinfo-h.bad { color:#a3212a; } .vinfo-h.warn { color:#8a6a12; } .vinfo-h.ok { color:#136c47; }
   .vinfo-t { width:100%; border-collapse:collapse; }
   .vinfo-t td { border:1px solid #e6e8ec; padding:6px 9px; vertical-align:top; }
   .vinfo-t td:first-child { white-space:nowrap; background:#f7f8fa; width:150px; }
-  #vinfoDlg code { background:rgba(0,0,0,.06); padding:0 4px; border-radius:3px; }
+  #vinfoDlg code, #linfoDlg code { background:rgba(0,0,0,.06); padding:0 4px; border-radius:3px; }
   #verList .verrow, #dv_list .verrow, #off_list .verrow { display:flex; justify-content:space-between; gap:10px; padding:9px 12px; cursor:pointer; border-bottom:1px solid #eef0f3; font-size:13px; align-items:center; }
   #verList .verrow:hover, #dv_list .verrow:hover { background:#eef5ff; }
   #verList .verrow .vn, #dv_list .verrow .vn, #off_list .verrow .vn { font-weight:600; color:#2a2f36; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
@@ -261,6 +261,55 @@
     </form>
   </dialog>
 
+  <dialog id="linfoDlg">
+    <form method="dialog" class="dlg" style="width:min(94vw,720px);max-height:88vh;overflow:auto">
+      <h3>ℹ 라이브 테이블 검증 — 무엇을 확인하나</h3>
+      <div class="meta">EventSchedule 은 <b>행마다 키</b>(<code>EventSchedule_그룹_인덱스</code>)를 가지고, 그 키가 <b>인덱스 번호에 묶여</b> 있습니다. 그래서 인덱스가 한 칸만 밀려도 이미 서비스 중인 행이 다른 이벤트로 덮어써집니다. 이 검증은 그 사고를 추출 전에 잡습니다.</div>
+
+      <div class="vinfo-sec"><div class="vinfo-h">기준: “도래한 이벤트”</div>
+        <div><b>시작일 ≤ 오늘</b>(<span id="li_today"></span>)인 이벤트 = 이미 시작했거나 끝난 이벤트 → <b>키·기간·내용 모두 불변</b>.<br>시작일이 미래인 이벤트 = 변경·삭제·추가 <b>모두 자유</b>.</div></div>
+
+      <div class="vinfo-sec"><div class="vinfo-h">같은 이벤트인지 판정하는 방법</div>
+        <div>· <b>의미</b> = <code>시작일 + eventDefinitionKey</code> (추출키가 비어 있으면 <code>이벤트 설명</code>으로 대체)<br>
+             · <b>레코드</b> = 1열 키 <code>EventSchedule_그룹_인덱스</code><br>
+             이 둘이 어긋나는 것이 곧 <b>인덱스가 바뀐 것</b>입니다.</div></div>
+
+      <div class="vinfo-sec"><div class="vinfo-h bad">❌ 위반 — 추출 시 확인창으로 막습니다</div>
+        <table class="vinfo-t">
+          <tr><td><b>도래 이벤트 인덱스 변경</b></td><td>같은 이벤트인데 키가 달라짐 → 운영툴 행이 밀려 라이브 기록이 어긋남</td></tr>
+          <tr><td><b>키 재사용 충돌</b></td><td>같은 키 자리에 <b>다른 이벤트</b>가 들어옴 → 임포트하면 라이브 행이 조용히 덮어써짐 (시작 인덱스를 잘못 잡은 append 에서 주로 발생)</td></tr>
+          <tr><td><b>도래 이벤트 내용 변경</b></td><td>종료일·기간·타입·설명·조건·spareTime 이 다름 → 진행 중인 이벤트가 바뀜</td></tr>
+          <tr><td><b>도래 이벤트 누락</b></td><td><b>추출 날짜범위 안</b>인데 이번 추출에 없음 → 덮어쓸 구간에서 행이 사라짐</td></tr>
+          <tr><td><b>과거 이벤트 추가</b></td><td>이미 지난 날짜로 행을 새로 만듦 (운영툴엔 없던 것) → “뒤에만 추가” 규칙 위반</td></tr>
+        </table></div>
+
+      <div class="vinfo-sec"><div class="vinfo-h warn">⚠ 참고 — 허용되지만 알려줍니다</div>
+        <table class="vinfo-t">
+          <tr><td><b>추출 범위 밖 라이브 행</b></td><td>「이 날짜부터·까지」 밖의 과거 행 — 이번 추출이 건드리지 않으므로 무해 (신규만 뽑는 정상 사용법)</td></tr>
+          <tr><td><b>미래 이벤트 변동</b></td><td>미래 행 수가 달라짐 (정상적인 스케쥴 편집)</td></tr>
+          <tr><td><b>신규 이벤트</b></td><td>운영툴에 없던 미래 이벤트가 추가됨</td></tr>
+          <tr><td><b>그룹 번호 다름</b></td><td>추출 그룹이 라이브 도래 행의 그룹과 안 겹침 → 키가 아예 안 부딪힘 (의도한 것인지만 확인)</td></tr>
+          <tr><td><b>index 겹침</b></td><td>범위 밖 과거 행이 있는데(=뒤에 붙이는 상황) 시작 인덱스가 라이브 최대 index 이하 → 권장 시작값을 알려줍니다</td></tr>
+          <tr><td><b>확인 못 한 필드</b></td><td>운영툴 데이터의 그 칸이 <b>비어 있어</b> 비교를 못 한 항목 — 시트에서 뒤쪽 컬럼이 잘려 복사되면 흔히 발생. 그 값도 검사받으려면 컬럼까지 포함해 다시 복사</td></tr>
+        </table></div>
+
+      <div class="vinfo-sec"><div class="vinfo-h">검증하지 않는 것</div>
+        <div>· <b>운영툴 데이터에 비어 있는 칸</b> — “모르는 값”으로 보고 비교에서 빼고, 「확인 못 한 필드」로 알립니다 (빈 칸을 위반으로 세면 잘려 복사된 경우 전부 위반이 됨)<br>
+             · <b>미래 이벤트끼리의 차이</b> — 변경이 자유이므로 개수만 알려줍니다<br>
+             · <b>시각(시·분)</b> — 편집기는 자정 기준 날짜 단위라 <b>날짜만</b> 비교<br>
+             · <code>group</code>·<code>index</code> 자체 — 값 비교 대신 <b>키가 같은 이벤트를 가리키는지</b>로 판정<br>
+             · 현재 데이터를 안 붙여넣으면 검증 자체가 불가 (추출 시 경고만 뜸)</div></div>
+
+      <div class="vinfo-sec"><div class="vinfo-h ok">✅ 안전하게 쓰는 법</div>
+        <div>1. 시트에서 <b>현재 적용된 EventSchedule 행 전체</b>를 1열 포함해 복사 → 붙여넣기<br>
+             2. 뒤에만 추가할 때는 <b>「이 날짜부터」를 신규 구간 시작일로</b>, 시작 인덱스를 <b>라이브 최대 index + 1</b> 로<br>
+             3. 결과가 <b>초록(위반 없음)</b> 인지 확인 후 복사<br>
+             4. ⚠️ 전체를 다시 뽑을 때는 그룹·시작 인덱스를 <b>라이브와 똑같이</b> 맞춰야 인덱스가 안 밀립니다</div></div>
+
+      <div class="actions"><div></div><div class="right"><button type="button" class="primary" id="li_close">닫기</button></div></div>
+    </form>
+  </dialog>
+
   <dialog id="vinfoDlg">
     <form method="dialog" class="dlg" style="width:min(94vw,720px);max-height:88vh;overflow:auto">
       <h3>ℹ 라이브 검증 — 무엇을 확인하나</h3>
@@ -351,7 +400,7 @@
   </dialog>
 
   <dialog id="copyLiveDlg">
-    <form method="dialog" class="dlg" style="width:360px">
+    <form method="dialog" class="dlg" style="width:min(94vw,620px);max-height:90vh;overflow:auto">
       <h3>📋 라이브 테이블 복사</h3>
       <div class="row"><label>그룹 시작번호</label><input id="cl_start" type="number" min="0" value="1"></div>
       <div class="meta">그룹은 <b>이 번호로 고정</b>됩니다 (타임라인 개행·줄당일수와 무관). index 만 아래 시작 인덱스부터 1씩 증가.</div>
@@ -363,7 +412,13 @@
       <div class="meta">비우면 끝까지. 지정 시 <b>시작일이 이 날짜 이전(포함)</b>인 스케쥴만.</div>
       <div class="row"><label></label><label style="flex:1;display:flex;align-items:center;gap:6px;font-weight:600;color:#555"><input type="checkbox" id="cl_useEnd"> 편집툴 설정 날짜까지 사용</label></div>
       <div class="meta">켜면 「이 날짜까지」 무시하고 <b>타임라인 끝날(시작일+기간−1)</b>까지 사용.</div>
-      <div class="actions"><div></div><div class="right"><button type="button" id="cl_cancel">취소</button><button type="button" class="primary" id="cl_ok">복사</button></div></div>
+      <div class="tnbase">
+        <div class="tnlbl">운영툴 현재 데이터 <code>라이브 훼손 검증용</code></div>
+        <div class="tnhint">시트·운영툴에 <b>현재 적용된 EventSchedule 행</b>을 복사해 여기 붙여넣기. <code>DB_FIELD_NAMES</code> 헤더 행이 섞여 있어도 되고, 1열 키가 없는 행은 무시됩니다. 도래한(시작일 ≤ 오늘) 이벤트가 <b>키·기간·내용 그대로인지</b>, 추가가 <b>뒤에만</b> 됐는지 검사합니다.</div>
+        <textarea id="cl_base" placeholder="EventSchedule_1_1&#9;EventSchedule&#9;1&#9;1&#9;…   (시트에서 탭 구분 행 그대로 붙여넣기)"></textarea>
+      </div>
+      <div id="cl_verify" style="margin:8px 0;font-size:12px"></div>
+      <div class="actions"><div><button type="button" id="cl_check">🔍 라이브 검증</button> <button type="button" id="cl_info" title="이 검증이 무엇을 확인하는지 보기">ℹ 검증 항목</button></div><div class="right"><button type="button" id="cl_cancel">취소</button><button type="button" class="primary" id="cl_ok">복사</button></div></div>
     </form>
   </dialog>
 
@@ -1204,6 +1259,7 @@ function migrate(){ // 부스트 → 가챠부스트 (타입 분리 이전 데�
   if(state.liveFromDate===undefined) state.liveFromDate="";
   if(state.liveToDate===undefined) state.liveToDate="";
   if(state.liveUseEnd===undefined) state.liveUseEnd=false;
+  if(state.liveBase===undefined) state.liveBase="";
   if(state.tourneyFromDate===undefined) state.tourneyFromDate="";
   if(state.offlineFromDate===undefined) state.offlineFromDate="";
   if(!Array.isArray(state.dimmedTypes)) state.dimmedTypes=[];
@@ -1577,7 +1633,7 @@ document.getElementById("exportSetup").addEventListener("click",openExportSetup)
 document.getElementById("export_ok").addEventListener("click",()=>exportDlg.close());
 
 // ===== 라이브이벤트 테이블용 클립보드 복사 (EventSchedule TSV, 데이터행만) =====
-function liveTableTSV(groupStart, fromDate, indexStart, toDate){
+function liveTableData(groupStart, fromDate, indexStart, toDate){
   const map=buildSynthMap(); const colCount=SYNTH_FIELDS.length; const daysKey="몇일동안?";
   const iStart=(indexStart==null?1:indexStart);
   // 정렬 = 시작일 → eventDefinitionKey(추출키) → 이름 → 기간. subLane(줄 위치)은 최후 수단 —
@@ -1591,18 +1647,132 @@ function liveTableTSV(groupStart, fromDate, indexStart, toDate){
         return (typeof ka[i]==="number") ? ka[i]-kb[i] : String(ka[i]).localeCompare(String(kb[i])); }
       return (a.subLane||0)-(b.subLane||0);
     });
-  if(!bars.length) return "";
+  if(!bars.length) return {tsv:"", rows:[]};
   // group = 입력한 시작번호 고정, index = 시작번호부터 연속 증가. 밴드(개행)·줄당일수 같은 화면 레이아웃은 번호에 영향 X
-  const grp=(groupStart||1); let seq=0; const lines=[]; const setC=(arr,name,val)=>{ if(map[name]!=null) arr[map[name]]=val; };
+  const grp=(groupStart||1); let seq=0; const lines=[], rows=[]; const setC=(arr,name,val)=>{ if(map[name]!=null) arr[map[name]]=val; };
   for(const b of bars){ const idx=iStart+seq; seq++;
-    const d=parseD(b.startDate), start=`${b.startDate}T00:00:00Z`, end=`${addDays(b.startDate,b.days)}T00:00:00Z`, bdef=defOf(b);
-    const arr=new Array(colCount).fill(""); arr[0]=`EventSchedule_${grp}_${idx}`; arr[1]="EventSchedule";
+    const d=parseD(b.startDate), start=`${b.startDate}T00:00:00Z`, endDate=addDays(b.startDate,b.days), end=`${endDate}T00:00:00Z`, bdef=defOf(b);
+    const pk=`EventSchedule_${grp}_${idx}`;
+    const evType=String((bdef&&bdef.exportEventType)||barType(b)), name=String(barName(b)||""), defKey=String((bdef&&bdef.exportKey)||"");
+    const openCond=b.openCondition||"OnTime", condVal=String(b.conditionValue||""), expireCond=b.expireCondition||"Timeout", spare=String(b.spareTime||"24");
+    const arr=new Array(colCount).fill(""); arr[0]=pk; arr[1]="EventSchedule";
     setC(arr,"group",grp); setC(arr,"index",idx); setC(arr,"year",d.getUTCFullYear()); setC(arr,"month",d.getUTCMonth()+1); setC(arr,"day",d.getUTCDate());
-    setC(arr,"이벤트 타입",(bdef&&bdef.exportEventType)||barType(b)); setC(arr,"이벤트 설명",barName(b)); setC(arr,"eventDefinitionKey",(bdef&&bdef.exportKey)||"");
-    setC(arr,"openConditioin",b.openCondition||"OnTime"); setC(arr,"conditionValue",b.conditionValue||""); setC(arr,"expireCondition",b.expireCondition||"Timeout");
-    setC(arr,"startTime",start); setC(arr,"endTime",end); setC(arr,"duration",b.days*24); setC(arr,daysKey,b.days); setC(arr,"spareTime",b.spareTime||"24");
-    lines.push(arr.join("\t")); }
-  return lines.join("\r\n");
+    setC(arr,"이벤트 타입",evType); setC(arr,"이벤트 설명",name); setC(arr,"eventDefinitionKey",defKey);
+    setC(arr,"openConditioin",openCond); setC(arr,"conditionValue",condVal); setC(arr,"expireCondition",expireCond);
+    setC(arr,"startTime",start); setC(arr,"endTime",end); setC(arr,"duration",b.days*24); setC(arr,daysKey,b.days); setC(arr,"spareTime",spare);
+    lines.push(arr.join("\t"));
+    rows.push({ pk, group:grp, index:idx, startDate:b.startDate, endDate, days:b.days, evType, name, defKey, openCond, condVal, expireCond, spare });
+  }
+  return {tsv:lines.join("\r\n"), rows};
+}
+function liveTableTSV(groupStart, fromDate, indexStart, toDate){ return liveTableData(groupStart, fromDate, indexStart, toDate).tsv; }
+// ===== 운영툴 현재 데이터(붙여넣은 TSV) 파싱 =====
+// 시트에서 복사한 걸 관대하게 읽는다: DB_FIELD_NAMES 헤더가 있으면 그 컬럼 순서, 없으면 SYNTH_FIELDS 순서.
+// 1열이 EventSchedule_{그룹}_{인덱스} 가 아닌 행(헤더·주석·빈 줄)은 skipped 로 세고 무시.
+function parseLiveTSV(text){
+  const lines=String(text||"").split(/\r\n|\n|\r/).filter(l=>l.trim()!=="");
+  let map=buildSynthMap(); const rows=[]; let skipped=0;
+  for(const line of lines){
+    const c=line.split("\t"), k=(c[0]||"").trim();
+    if(k==="DB_FIELD_NAMES"){ // 헤더 행 → 컬럼 위치를 이 행 기준으로 (시트 컬럼이 밀려 있어도 맞음)
+      const m={}; for(let i=1;i<c.length;i++){ const t=(c[i]||"").trim(); if(t) m[t]=i; }
+      if(Object.keys(m).length) map=m; continue;
+    }
+    const mm=/^EventSchedule_(\d+)_(\d+)$/.exec(k);
+    if(!mm){ skipped++; continue; }
+    rows.push(liveRowFromCells(c, map, k, parseInt(mm[1],10), parseInt(mm[2],10)));
+  }
+  return {rows, skipped};
+}
+function liveRowFromCells(c, map, pk, group, index){
+  const g=n=>{ const i=map[n]; return i==null?"":String(c[i]==null?"":c[i]).trim(); };
+  const dOf=s=>{ const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(s||"").trim()); return m?m[0]:""; };
+  let start=dOf(g("startTime"));
+  if(!start){ const y=parseInt(g("year"),10), mo=parseInt(g("month"),10), da=parseInt(g("day"),10);
+    if(y&&mo&&da) start=`${y}-${pad(mo)}-${pad(da)}`; }
+  let days=parseInt(g("몇일동안?"),10);
+  if(isNaN(days)){ const du=parseInt(g("duration"),10); if(!isNaN(du)) days=Math.round(du/24); }
+  let end=dOf(g("endTime"));
+  if(!end && start && !isNaN(days)) end=addDays(start,days);
+  if(isNaN(days) && start && end) days=Math.round((parseD(end)-parseD(start))/86400000);
+  // 값이 없는 칸은 null/"" 로 남긴다 — 붙여넣은 범위에 그 컬럼이 없을 뿐이므로 "다른 값"으로 취급하면 안 됨
+  return { pk, group, index, startDate:start, endDate:end, days:(isNaN(days)?null:days),
+    evType:g("이벤트 타입"), name:g("이벤트 설명"), defKey:g("eventDefinitionKey"),
+    openCond:g("openConditioin"), condVal:g("conditionValue"), expireCond:g("expireCondition"), spare:g("spareTime") };
+}
+// ===== 라이브 테이블 훼손 검증 — 도래한(시작일 ≤ 오늘) 이벤트는 키·내용 불변, 추가는 뒤에만 =====
+// liveRows = parseLiveTSV, genRows = liveTableData 의 행. from/to = 이번 추출 날짜범위("" = 무제한)
+// 행 키(EventSchedule_g_i)가 index 번호에 묶여 있어 인덱스가 밀리면 라이브 행이 덮어써진다 → 의미 동일성과 키 동일성을 따로 본다.
+function verifyLiveAgainstCurrent(liveRows, genRows, today, from, to){
+  const semOf=r=>r.startDate+"|"+(r.defKey || ("~"+r.name));   // 같은 날 + 같은 추출키 = 같은 이벤트. 추출키 없으면 이름으로 대체
+  const bucket=rows=>{ const m=new Map(); for(const r of rows){ const k=semOf(r); if(!m.has(k)) m.set(k,[]); m.get(k).push(r); } return m; };
+  const L=liveRows||[], G=genRows||[];
+  const lBuck=bucket(L), gBuck=bucket(G), lByPk=new Map(), gByPk=new Map();
+  for(const r of L) lByPk.set(r.pk,r);
+  for(const r of G) gByPk.set(r.pk,r);
+  const inRange=r=>(!from||r.startDate>=from)&&(!to||r.startDate<=to);
+  const label=r=>`${r.startDate} ${r.name||r.defKey||r.pk}`;
+  const CMP=[["endDate","종료일"],["days","기간(일)"],["evType","이벤트 타입"],["name","이벤트 설명"],["openCond","openCondition"],["condVal","conditionValue"],["expireCond","expireCondition"],["spare","spareTime"]];
+  const violations=[], notes=[], movedPks=new Set(), unverified=new Set();
+  const blank=v=>v===null||v===undefined||String(v).trim()==="";   // 운영툴 데이터에 없는 칸 = "모르는 값" (다른 값 아님)
+  let outRange=0, outMin="", outMax="";
+  for(const [sem, ls] of lBuck){
+    const gs=gBuck.get(sem)||[];
+    for(let i=0;i<ls.length;i++){
+      const l=ls[i]; if(l.startDate>today) continue;      // 미래 = 변경 자유
+      const g=gs[i];
+      if(!g){
+        if(inRange(l)) violations.push({pk:l.pk, type:"도래 이벤트 누락", detail:`${label(l)} — 추출 범위(${from||"처음"}~${to||"끝"}) 안인데 이번 추출에 없음`});
+        else { outRange++; if(!outMin||l.startDate<outMin) outMin=l.startDate; if(l.startDate>outMax) outMax=l.startDate; }
+        continue;
+      }
+      if(g.pk!==l.pk){
+        const taker=gByPk.get(l.pk);
+        violations.push({pk:l.pk, type:"도래 이벤트 인덱스 변경",
+          detail:`${label(l)} — 운영툴 ${l.pk} → 추출 ${g.pk}`+(taker?` / 원래 자리 ${l.pk} 는 「${label(taker)}」가 차지`:"")});
+        movedPks.add(l.pk);
+      }
+      const diffs=[];
+      for(const [f,nm] of CMP){
+        if(blank(l[f])){ if(!blank(g[f])) unverified.add(nm); continue; }   // 운영툴 칸이 비어 있으면 비교 불가 → 참고로 모아 알림
+        if(String(l[f])!==String(g[f])) diffs.push(`${nm}: 운영툴 ${l[f]} → 추출 ${blank(g[f])?"—":g[f]}`);
+      }
+      if(diffs.length) violations.push({pk:l.pk, type:"도래 이벤트 내용 변경", detail:`${label(l)} — ${diffs.join(" · ")}`});
+    }
+  }
+  // 키 재사용 충돌 — 도래 행의 키 자리에 다른 이벤트가 들어오는 경우(시작 인덱스 잘못 잡은 append 가 대표). 인덱스 변경으로 이미 보고한 키는 제외
+  for(const [pk, l] of lByPk){
+    if(l.startDate>today || movedPks.has(pk)) continue;
+    const g=gByPk.get(pk); if(!g || semOf(g)===semOf(l)) continue;
+    violations.push({pk, type:"키 재사용 충돌", detail:`${pk} 자리: 운영툴 「${label(l)}」 → 추출 「${label(g)}」 — 임포트하면 라이브 행이 다른 이벤트로 덮어써짐`});
+  }
+  // 과거 이벤트 추가 / 신규(미래) 집계
+  let newCnt=0;
+  for(const [sem, gs] of gBuck){
+    const ls=lBuck.get(sem)||[];
+    for(let i=0;i<gs.length;i++){ const g=gs[i];
+      if(ls[i]) continue;
+      if(g.startDate<=today) violations.push({pk:g.pk, type:"과거 이벤트 추가", detail:`${label(g)} (${g.pk}) — 이미 도래한 날짜인데 운영툴에 없음 (뒤에만 추가 위반)`});
+      else newCnt++;
+    }
+  }
+  if(unverified.size) notes.push({pk:"—", type:"확인 못 한 필드", detail:`${[...unverified].join("·")} — 운영툴 데이터에 그 칸이 비어 있어 비교하지 못했습니다. 붙여넣은 범위에 해당 컬럼이 없으면 정상이고, 있어야 할 값이면 컬럼까지 포함해 다시 복사하세요`});
+  if(outRange) notes.push({pk:"—", type:"추출 범위 밖 라이브 행", detail:`${outRange}행 (${outMin}~${outMax}) — 이번 추출 범위(${from||"처음"}~${to||"끝"}) 밖이라 건드리지 않음`});
+  const fL=L.filter(r=>r.startDate>today).length, fG=G.filter(r=>r.startDate>today).length;
+  if(fL!==fG) notes.push({pk:"—", type:"미래 이벤트 변동", detail:`운영툴 ${fL}행 → 추출 ${fG}행 (미래는 변경 허용)`});
+  if(newCnt) notes.push({pk:"—", type:"신규 이벤트", detail:`${newCnt}행 — 운영툴에 없던 미래 이벤트 (정상 추가)`});
+  const lGrp=[...new Set(L.filter(r=>r.startDate<=today).map(r=>r.group))], gGrp=[...new Set(G.map(r=>r.group))];
+  if(lGrp.length && gGrp.length && !gGrp.some(x=>lGrp.includes(x)))
+    notes.push({pk:"—", type:"그룹 번호 다름", detail:`운영툴 도래 행 그룹 [${lGrp.join(",")}] → 추출 그룹 [${gGrp.join(",")}] — 키가 아예 안 겹칩니다 (의도한 것인지 확인)`});
+  if(outRange){ // 뒤에 붙이는 상황 → 시작 인덱스가 라이브 최대 index 뒤인지
+    const sameGrp=L.filter(r=>gGrp.includes(r.group)).map(r=>r.index);
+    const gIdx=G.map(r=>r.index);
+    if(sameGrp.length && gIdx.length){
+      const lMax=Math.max(...sameGrp), gMin=Math.min(...gIdx);
+      if(gMin<=lMax) notes.push({pk:"—", type:"index 겹침", detail:`운영툴 최대 index ${lMax} · 추출 시작 index ${gMin} — 뒤에만 추가하려면 시작 인덱스를 ${lMax+1} 로`});
+    }
+  }
+  return {violations, notes, liveCount:L.length, genCount:G.length, today, from, to};
 }
 function copyText(text){ if(navigator.clipboard&&window.isSecureContext){ return navigator.clipboard.writeText(text); }
   return new Promise((res,rej)=>{ const ta=document.createElement("textarea"); ta.value=text; ta.style.position="fixed"; ta.style.left="-9999px"; document.body.appendChild(ta); ta.select(); try{ document.execCommand("copy"); res(); }catch(e){ rej(e); } ta.remove(); }); }
@@ -1615,22 +1785,60 @@ document.getElementById("copyLive").addEventListener("click",()=>{
   document.getElementById("cl_to").value=state.liveToDate||"";
   document.getElementById("cl_useEnd").checked=!!state.liveUseEnd;
   document.getElementById("cl_to").disabled=!!state.liveUseEnd;
+  document.getElementById("cl_base").value=state.liveBase||"";
   copyLiveDlg.showModal();
+  runLiveVerify();
 });
-document.getElementById("cl_useEnd").addEventListener("change",e=>{ document.getElementById("cl_to").disabled=e.target.checked; });
-document.getElementById("cl_start").addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); document.getElementById("cl_ok").click(); } });
-document.getElementById("cl_idx").addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); document.getElementById("cl_ok").click(); } });
-document.getElementById("cl_cancel").addEventListener("click",()=>copyLiveDlg.close());
-document.getElementById("cl_ok").addEventListener("click",()=>{
+function readLiveForm(){
   const gs=Math.max(0, parseInt(document.getElementById("cl_start").value,10)||1);
   const is=Math.max(0, parseInt(document.getElementById("cl_idx").value,10)); const iStart=isNaN(is)?1:is;
   const from=document.getElementById("cl_from").value||"";
   const useEnd=document.getElementById("cl_useEnd").checked;
   const manualTo=document.getElementById("cl_to").value||"";
-  const to = useEnd ? addDays(state.startDate, state.totalDays-1) : manualTo;  // 편집툴 끝날 or 수동
-  state.liveGroupStart=gs; state.liveIndexStart=iStart; state.liveFromDate=from; state.liveToDate=manualTo; state.liveUseEnd=useEnd; save();
-  const tsv=liveTableTSV(gs, from, iStart, to); copyLiveDlg.close();
-  if(!tsv){ alert("대상 스케쥴 없음"+(from||to?` (${from||"처음"}~${to||"끝"} 조건)`:"")); return; }
+  return {gs, iStart, from, useEnd, manualTo, to:(useEnd ? addDays(state.startDate, state.totalDays-1) : manualTo)};
+}
+// 검증 실행 + 결과 렌더. 반환: {violations,notes} 또는 null(붙여넣은 데이터 없음/읽을 행 없음)
+function runLiveVerify(){
+  const box=document.getElementById("cl_verify"); if(!box) return null;
+  const raw=(document.getElementById("cl_base").value||"").trim();
+  if(!raw){ box.innerHTML=`<div class="vbox warn"><div class="vhead">⚠ 운영툴 현재 데이터 없음 — 라이브 검증 불가</div>이미 적용된 이벤트의 <b>인덱스가 밀리거나 내용이 바뀌어도</b> 잡아낼 수 없습니다. 시트의 현재 EventSchedule 행을 위 칸에 붙여넣으세요.</div>`; return null; }
+  const p=parseLiveTSV(raw);
+  if(!p.rows.length){ box.innerHTML=`<div class="vbox bad"><div class="vhead">❌ 읽을 행이 없음</div><code>EventSchedule_그룹_인덱스</code> 로 시작하는 행이 없습니다. <b>1열(키) 포함</b>해서 복사했는지 확인하세요.</div>`; return null; }
+  const f=readLiveForm();
+  const gen=liveTableData(f.gs, f.from, f.iStart, f.to).rows;
+  const v=verifyLiveAgainstCurrent(p.rows, gen, todayISO(), f.from, f.to);
+  const li=a=>a.map(x=>`<li><code>${escapeHtml(x.pk)}</code> · <b>${escapeHtml(x.type)}</b> — ${escapeHtml(x.detail)}</li>`).join("");
+  let html="";
+  if(v.violations.length) html+=`<div class="vbox bad"><div class="vhead">❌ 라이브 훼손 위반 ${v.violations.length}건 — 이대로 붙여넣으면 서비스 데이터가 깨집니다</div><ul>${li(v.violations)}</ul></div>`;
+  else html+=`<div class="vbox ok"><div class="vhead">✅ 위반 없음 — 도래한 이벤트(오늘 ${todayISO()} 이전 시작) 모두 그대로 유지됨</div>운영툴 ${v.liveCount}행 · 추출 ${v.genCount}행 비교${p.skipped?` (키 없는 ${p.skipped}행은 무시)`:""}.</div>`;
+  if(v.notes.length) html+=`<div class="vbox warn" style="margin-top:6px"><div class="vhead">ℹ 참고 ${v.notes.length}건 (허용되는 변경)</div><ul>${li(v.notes)}</ul></div>`;
+  box.innerHTML=html;
+  return v;
+}
+document.getElementById("cl_check").addEventListener("click",runLiveVerify);
+const linfoDlg=document.getElementById("linfoDlg");
+document.getElementById("cl_info").addEventListener("click",()=>{ document.getElementById("li_today").textContent=todayISO(); if(!linfoDlg.open) linfoDlg.showModal(); });
+document.getElementById("li_close").addEventListener("click",()=>linfoDlg.close());
+document.getElementById("cl_base").addEventListener("input",()=>{ state.liveBase=document.getElementById("cl_base").value; save(); runLiveVerify(); });
+["cl_start","cl_idx","cl_from","cl_to"].forEach(id=>document.getElementById(id).addEventListener("change",runLiveVerify));
+document.getElementById("cl_useEnd").addEventListener("change",e=>{ document.getElementById("cl_to").disabled=e.target.checked; runLiveVerify(); });
+document.getElementById("cl_start").addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); document.getElementById("cl_ok").click(); } });
+document.getElementById("cl_idx").addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); document.getElementById("cl_ok").click(); } });
+document.getElementById("cl_cancel").addEventListener("click",()=>copyLiveDlg.close());
+document.getElementById("cl_ok").addEventListener("click",()=>{
+  const {gs, iStart, from, useEnd, manualTo, to}=readLiveForm();   // to = 편집툴 끝날 or 수동
+  state.liveGroupStart=gs; state.liveIndexStart=iStart; state.liveFromDate=from; state.liveToDate=manualTo; state.liveUseEnd=useEnd;
+  state.liveBase=document.getElementById("cl_base").value; save();
+  const tsv=liveTableTSV(gs, from, iStart, to);
+  if(!tsv){ copyLiveDlg.close(); alert("대상 스케쥴 없음"+(from||to?` (${from||"처음"}~${to||"끝"} 조건)`:"")); return; }
+  // 라이브 훼손 검증 — 위반이면 확인 후에만 진행, 붙여넣은 현재 데이터가 없으면 경고
+  const v=runLiveVerify();
+  if(!v){ if(!confirm("운영툴 현재 데이터가 없어 라이브 훼손 검증을 못 했습니다.\n(도래한 이벤트의 인덱스가 밀리거나 내용이 바뀌어도 잡히지 않음)\n\n그래도 복사할까요?")) return; }
+  else if(v.violations.length){
+    const lines=v.violations.slice(0,8).map(x=>`· ${x.pk} — ${x.type}: ${x.detail}`).join("\n");
+    if(!confirm(`❌ 라이브 훼손 위반 ${v.violations.length}건이 있습니다. 이대로 시트에 붙여넣으면 서비스 데이터가 깨집니다.\n\n${lines}${v.violations.length>8?"\n… 나머지는 창의 검증 결과 참고":""}\n\n그래도 복사할까요?`)) return;
+  }
+  copyLiveDlg.close();
   copyText(tsv).then(()=>alert(`라이브 테이블 ${tsv.split("\r\n").length}행 복사됨 (그룹 ${gs}/인덱스 ${iStart}부터${from?`, ${from} 이후`:""}${to?`, ${to} 이전`:""}${useEnd?" [편집툴 끝날]":""}) — 구글시트에 붙여넣기(Ctrl+V).`)).catch(e=>alert("복사 실패: "+e.message));
 });
 // ===== 토너먼트 운영툴용 JSON 추출 (고정 베이스 + 스케쥴 토너) =====
