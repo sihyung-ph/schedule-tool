@@ -105,6 +105,14 @@
   #imgDlg .img-preview-wrap { flex:1; min-height:200px; max-height:66vh; overflow:auto; border:1px solid #e0e3e8; border-radius:10px; background:#f6f8fa; display:flex; align-items:center; justify-content:center; padding:10px; margin:8px 0; }
   #imgDlg .img-preview-wrap img { max-width:100%; display:block; box-shadow:0 2px 10px rgba(0,0,0,.12); border-radius:6px; }
   #imgDlg .actions button { padding:8px 16px; font-size:13px; }
+  #tn_verify .vbox { border-radius:8px; padding:9px 11px; border:1px solid; }
+  #tn_verify .vbox.ok { background:#eaf7f0; border-color:#a9dcc5; color:#136c47; }
+  #tn_verify .vbox.bad { background:#fdecec; border-color:#f0b4b4; color:#a3212a; }
+  #tn_verify .vbox.warn { background:#fff8e6; border-color:#f0dca4; color:#8a6a12; }
+  #tn_verify .vhead { font-weight:800; margin-bottom:5px; }
+  #tn_verify ul { margin:4px 0 0; padding-left:18px; max-height:22vh; overflow:auto; }
+  #tn_verify li { margin:2px 0; line-height:1.45; }
+  #tn_verify code { background:rgba(0,0,0,.06); padding:0 4px; border-radius:3px; }
   #verList .verrow, #dv_list .verrow, #off_list .verrow { display:flex; justify-content:space-between; gap:10px; padding:9px 12px; cursor:pointer; border-bottom:1px solid #eef0f3; font-size:13px; align-items:center; }
   #verList .verrow:hover, #dv_list .verrow:hover { background:#eef5ff; }
   #verList .verrow .vn, #dv_list .verrow .vn, #off_list .verrow .vn { font-weight:600; color:#2a2f36; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
@@ -353,12 +361,13 @@
         </div>
       </details>
       <div class="tnbase">
-        <div class="tnlbl">고정 베이스 JSON <code>고정 클랜 토너먼트</code></div>
-        <div class="tnhint">운영툴에 <b>항상</b> 들어가야 하는 고정 클랜 토너먼트 레코드(ClanQuest · ClanRaidStage 등). 운영툴 [토너먼트 &gt; 데이터 추출/덮어쓰기]에서 JSON 추출 → 여기 붙여넣기. 매 추출 시 이 베이스가 스케쥴 토너 <b>앞에 그대로 포함</b>됨. 베이스가 바뀌면 다시 붙여넣기. (비워두면 스케쥴 토너만 추출)</div>
-        <textarea id="tn_base" placeholder="[ { ...클랜 베이스 레코드... } ]"></textarea>
+        <div class="tnlbl">운영툴 현재 JSON <code>필수 — 고정 베이스 + 라이브 검증</code></div>
+        <div class="tnhint">운영툴 [토너먼트 &gt; 데이터 추출/가져오기]에서 <b>JSON 추출 전체</b>를 복사해 여기 붙여넣기. 두 가지로 쓰임: ① 클랜 등 <b>고정 베이스는 그대로 포함</b> ② 기존 토너와 비교해 <b>라이브 훼손 검증</b> (도래한 시즌은 불변, 미래 시즌은 변경 허용). 운영툴 값이 바뀌면 다시 붙여넣기.</div>
+        <textarea id="tn_base" placeholder="[ { ...운영툴에서 추출한 전체 JSON... } ]"></textarea>
       </div>
+      <div id="tn_verify" style="margin:8px 0;font-size:12px"></div>
       <div class="meta" id="tn_status" style="min-height:16px"></div>
-      <div class="actions"><div></div><div class="right"><button type="button" id="tn_cancel">취소</button><button type="button" class="primary" id="tn_ok">추출(복사)</button></div></div>
+      <div class="actions"><div><button type="button" id="tn_check">🔍 라이브 검증</button></div><div class="right"><button type="button" id="tn_cancel">취소</button><button type="button" class="primary" id="tn_ok">추출(복사)</button></div></div>
     </form>
   </dialog>
 
@@ -1645,6 +1654,40 @@ function buildOfflineTournamentJSON(def, fromDate){
   }
   return { records:out, count:out.length, seasonTotal:out.reduce((a,r)=>a+r.seasons.length,0), noKey };
 }
+// ===== 라이브 훼손 검증 — 도래한 시즌(시작일 ≤ 오늘)은 불변, 미래 시즌은 변경 자유 =====
+// liveRecords = 운영툴 현재 JSON 배열, genRecords = 이번에 추출될 레코드 배열, today = "YYYY-MM-DD"
+function verifyTourneyAgainstLive(liveRecords, genRecords, today){
+  const dOf=s=>String(s||"").slice(0,10);
+  const seasonsOf=r=>{ const cs=r&&r.SeasonSetting&&r.SeasonSetting.CustomSeasonDatas;
+    return Array.isArray(cs) ? cs.map(s=>({s:dOf(s.StartAt), e:dOf(s.EndAt)})) : null; };
+  const skOf=r=>(r&&(r.SK||(r.SKObj&&r.SKObj.ContentId)))||"";
+  const live=new Map(), gen=new Map();
+  for(const r of (liveRecords||[])){ const sk=skOf(r), ss=seasonsOf(r); if(sk&&ss) live.set(sk,ss); }   // CustomSeasonDatas 있는 스케쥴 토너만 (클랜 베이스=null 제외)
+  for(const r of (genRecords||[])){ const sk=skOf(r), ss=seasonsOf(r); if(sk&&ss) gen.set(sk,ss); }
+  const violations=[], notes=[];
+  for(const [sk, ls] of live){
+    const arrived=ls.filter(x=>x.s<=today);              // 도래한(시작한) 시즌 = 불변 대상
+    const gs=gen.get(sk);
+    if(!gs){
+      if(arrived.length) violations.push({sk, type:"컨텐츠 누락", detail:`도래한 시즌 ${arrived.length}개가 이번 추출에 없음 (${arrived.map(a=>a.s).join(", ")}) — 임포트하면 라이브 기록이 사라짐`});
+      else notes.push({sk, type:"이번 추출에 없음", detail:"도래한 시즌이 없어 영향 없음"});
+      continue;
+    }
+    const gByStart=new Map(gs.map(x=>[x.s,x]));
+    for(const a of arrived){
+      const g=gByStart.get(a.s);
+      if(!g) violations.push({sk, type:"도래 시즌 삭제", detail:`${a.s}~${a.e} 시즌이 이번 추출에 없음`});
+      else if(g.e!==a.e) violations.push({sk, type:"도래 시즌 기간 변경", detail:`${a.s} 시즌 종료일: 운영툴 ${a.e} → 추출 ${g.e}`});
+    }
+    const lStarts=new Set(ls.map(x=>x.s));
+    for(const g of gs) if(g.s<=today && !lStarts.has(g.s))
+      violations.push({sk, type:"과거 시즌 추가", detail:`${g.s}~${g.e} 는 이미 도래한 날짜인데 운영툴엔 없음 (뒤에만 추가 위반)`});
+    const fL=ls.filter(x=>x.s>today).length, fG=gs.filter(x=>x.s>today).length;
+    if(fL!==fG) notes.push({sk, type:"미래 시즌 변동", detail:`운영툴 ${fL}개 → 추출 ${fG}개 (미래는 변경 허용)`});
+  }
+  for(const [sk] of gen) if(!live.has(sk)) notes.push({sk, type:"신규 컨텐츠", detail:"운영툴에 없던 ContentId — 새로 추가됨"});
+  return { violations, notes, liveCount:live.size, genCount:gen.size, today };
+}
 const tourneyDlg=document.getElementById("tourneyDlg");
 function fillTourneyForm(){ const d=state.tourneyDefaults||defaultTourneyDefaults();
   document.getElementById("tn_cat").value=(d.CategoryIds||[]).join(",");
@@ -1686,7 +1729,7 @@ function readTourneyForm(){
 }
 document.getElementById("copyTourney").addEventListener("click",()=>{
   if(!state.bars.some(b=>{const d=defOf(b);return barType(b)==="토너먼트" && d && (d.exportTargets||[]).includes("tournament");})){ alert("토너먼트 운영툴 대상 스케쥴이 없습니다.\n📤 추출 설정에서 '토너먼트 운영툴' 체크 + '토너 DefKey' 입력하세요."); return; }
-  fillTourneyForm(); tourneyDlg.showModal();
+  fillTourneyForm(); tourneyDlg.showModal(); runTourneyVerify();
 });
 // --- 오프라인 추출 다이얼로그 (설정 + 미리보기 후 복사) ---
 const offDlg=document.getElementById("offDlg");
@@ -1735,6 +1778,27 @@ function persistTourneyForm(){ // 입력 즉시 state 반영 → 취소/닫아�
 }
 tourneyDlg.addEventListener("input", persistTourneyForm);
 tourneyDlg.addEventListener("change", persistTourneyForm);
+// 검증 실행 + 결과 렌더 (추출 다이얼로그 안). 반환: {violations,notes} 또는 null(베이스 없음/파싱실패)
+function runTourneyVerify(){
+  const box=document.getElementById("tn_verify"); if(!box) return null;
+  const raw=(document.getElementById("tn_base").value||"").trim();
+  if(!raw){ box.innerHTML=`<div class="vbox warn"><div class="vhead">⚠ 운영툴 현재 JSON 없음 — 라이브 검증 불가</div>기존 토너를 덮어쓸 때 <b>도래한 시즌이 훼손</b>돼도 잡아낼 수 없습니다. 운영툴에서 JSON 추출 후 위 칸에 붙여넣으세요.</div>`; return null; }
+  let live; try{ live=JSON.parse(raw); if(!Array.isArray(live)) throw new Error("배열이 아님"); }
+  catch(e){ box.innerHTML=`<div class="vbox bad"><div class="vhead">❌ 운영툴 JSON 파싱 실패</div>${escapeHtml(e.message)}</div>`; return null; }
+  let res; try{ res=buildTournamentJSON(readTourneyForm(), document.getElementById("tn_from").value||""); }
+  catch(e){ box.innerHTML=`<div class="vbox bad"><div class="vhead">❌ 추출 계산 실패</div>${escapeHtml(e.message)}</div>`; return null; }
+  const v=verifyTourneyAgainstLive(live, res.records, todayISO());
+  const li=a=>a.map(x=>`<li><code>${escapeHtml(x.sk)}</code> · <b>${escapeHtml(x.type)}</b> — ${escapeHtml(x.detail)}</li>`).join("");
+  let html="";
+  if(v.violations.length) html+=`<div class="vbox bad"><div class="vhead">❌ 라이브 훼손 위반 ${v.violations.length}건 — 이대로 임포트하면 서비스 데이터가 깨집니다</div><ul>${li(v.violations)}</ul></div>`;
+  else html+=`<div class="vbox ok"><div class="vhead">✅ 위반 없음 — 도래한 시즌(오늘 ${todayISO()} 이전 시작) 모두 그대로 유지됨</div>운영툴 토너 ${v.liveCount}종 · 추출 ${v.genCount}종 비교.</div>`;
+  if(v.notes.length) html+=`<div class="vbox warn" style="margin-top:6px"><div class="vhead">ℹ 참고 ${v.notes.length}건 (허용되는 변경)</div><ul>${li(v.notes)}</ul></div>`;
+  box.innerHTML=html;
+  return v;
+}
+document.getElementById("tn_check").addEventListener("click",runTourneyVerify);
+document.getElementById("tn_base").addEventListener("change",runTourneyVerify);
+document.getElementById("tn_from").addEventListener("change",runTourneyVerify);
 document.getElementById("tn_cancel").addEventListener("click",()=>{ persistTourneyForm(); tourneyDlg.close(); });
 document.getElementById("tn_ok").addEventListener("click",()=>{
   const def=readTourneyForm();
@@ -1742,6 +1806,13 @@ document.getElementById("tn_ok").addEventListener("click",()=>{
   persistTourneyForm();
   let res; try{ res=buildTournamentJSON(def, from); }catch(err){ document.getElementById("tn_status").textContent="❌ 베이스 JSON 파싱 실패: "+err.message; return; }
   if(!res.typeCount){ document.getElementById("tn_status").textContent="⚠ 토너 DefKey 입력된 대상 스케쥴이 없습니다."+(from?` (${from} 이후 조건)`:"")+(res.noKey.length?` (DefKey 미입력: ${res.noKey.length}건)`:""); return; }
+  // 라이브 훼손 검증 — 위반 있으면 확인 후에만 진행, 운영툴 JSON 없으면 경고
+  const v=runTourneyVerify();
+  if(!v){ if(!confirm("운영툴 현재 JSON 이 없어 라이브 훼손 검증을 못 했습니다.\n(도래한 시즌이 삭제·변경돼도 잡히지 않음)\n\n그래도 추출할까요?")) return; }
+  else if(v.violations.length){
+    const lines=v.violations.slice(0,8).map(x=>`· ${x.sk} — ${x.type}: ${x.detail}`).join("\n");
+    if(!confirm(`❌ 라이브 훼손 위반 ${v.violations.length}건이 있습니다. 이대로 운영툴에 임포트하면 서비스 데이터가 깨집니다.\n\n${lines}${v.violations.length>8?"\n… 나머지는 창의 검증 결과 참고":""}\n\n그래도 추출할까요?`)) return;
+  }
   const json=JSON.stringify(res.records,null,2);
   copyText(json).then(()=>{
     tourneyDlg.close();
