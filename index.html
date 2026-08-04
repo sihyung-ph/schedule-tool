@@ -345,6 +345,7 @@
             <label title="클랜 검사용. 스케쥴 토너는 해제"><input id="tn_rel" type="checkbox"> 관계컨텐츠 <code>IsRelationShipContent</code></label>
             <label title="점수 안 먹어도 그룹 포함. 스케쥴 토너는 체크"><input id="tn_rank" type="checkbox"> 신규등록 <code>ActiveRankBoardRegister</code></label>
             <label title="랭킹보드에 사용자 프로필 미갱신"><input id="tn_freeze" type="checkbox"> 프로필 미갱신 <code>FreezeProfileCache</code></label>
+            <label title="운영툴에 이미 있는 ContentId 는 위 고정값 대신 운영툴 설정값을 그대로 유지 (시즌·기간만 갱신)"><input id="tn_inherit" type="checkbox"> <b>기존 컨텐츠 설정 상속</b> <code>권장</code></label>
           </div>
         </div>
       </details>
@@ -1169,7 +1170,7 @@ function defaultTourneyDefaults(){ return {
   CategoryIds:["Account"], MaxEntryGroupSize:100, RewardClaimableSeasonCount:1, RewardDurationMin:10080,
   SeparateByUserTags:[0], NoWindow:true, IsRelationShipContent:false, ActiveRankBoardRegister:true,
   SetScoreType:0, FreezeProfileCache:false, PeriodUnit:2, GameTitle:"idc",
-  RegisterBlockedMin:0, FillInLastGroupAfterRegisterBlockedMin:false   // 기본값 — 매트릭스에서 프리셋별 override 가능
+  RegisterBlockedMin:0, FillInLastGroupAfterRegisterBlockedMin:false, InheritLive:true   // 기본값 — 매트릭스에서 프리셋별 override 가능
 }; }
 function load(){ const raw=localStorage.getItem("scheduleToolV3"); if(raw){ try{ const o=JSON.parse(raw); if(!validState(o.state))return false; state=Object.assign({daysPerRow:60},o.state); if(!state.daysPerRow)state.daysPerRow=60; nextId=o.nextId||1; migrate(); return true; }catch(e){console.warn(e);} } return false; }
 // ===== 파일 저장/열기 (경로 선택 — File System Access API, 미지원 시 다운로드/파일선택 폴백) =====
@@ -1599,7 +1600,13 @@ function buildTournamentJSON(def, fromDate){
   const PK="GP)CONTENT#"+def.GameTitle, nowISO=new Date().toISOString();
   // SeasonSetting 상위: EndAt 고정. StartAt = 2020-01-01 에서 DefKey 끝 숫자만큼 밀어 토너별로 다르게(시즌ID 중복 방지). 실제 일정은 CustomSeasonDatas.
   const SEASON_BASE="2020-01-01", FIXED_END="2200-01-01T00:00:00";
-  const sched=[]; let seasonTotal=0; const durWarn=[];
+  // 운영툴 현재 JSON 먼저 파싱 → 기존 컨텐츠 설정값 상속용 조회 + 고정 베이스 병합용
+  let base=[]; const bt=(state.tourneyBase||"").trim();
+  if(bt){ const parsed=JSON.parse(bt); if(!Array.isArray(parsed)) throw new Error("베이스 JSON 이 배열이 아닙니다"); base=parsed; }
+  const liveMap=new Map();
+  for(const r of base){ const k=(r&&r.SK)||(r&&r.SKObj&&r.SKObj.ContentId); if(k) liveMap.set(k,r); }
+  const inherit = def.InheritLive!==false;   // 기존 ContentId 는 운영툴 설정값 그대로 (시즌·PeriodValue 만 갱신)
+  const sched=[], inherited=[]; let seasonTotal=0; const durWarn=[];
   for(const key of Object.keys(byKey)){
     const arr=byKey[key].slice().sort((a,b)=> dayIndex(a.startDate)-dayIndex(b.startDate) || (a.subLane||0)-(b.subLane||0));
     const seasons=arr.map(b=>({ StartAt:`${b.startDate}T00:00:00`, EndAt:`${addDays(b.startDate,b.days)}T00:00:00` }));
@@ -1614,23 +1621,31 @@ function buildTournamentJSON(def, fromDate){
     const regBlockedMin=(rbStr!=="" && !isNaN(parseInt(rbStr,10))) ? parseInt(rbStr,10) : (parseInt(def.RegisterBlockedMin,10)||0);
     const flStr=(fdef&&fdef.fillLastGroup!=null)?String(fdef.fillLastGroup):"";
     const fillLast=(flStr==="1"||flStr==="0") ? (flStr==="1") : !!def.FillInLastGroupAfterRegisterBlockedMin;
-    sched.push({
-      SeasonSetting:{ StartAt:startAt, EndAt:FIXED_END, PeriodUnit:6, PeriodValue:days0, IrregularPeriodMinutes:null, CustomSeasonDatas:seasons },
-      MaxEntryGroupSize:def.MaxEntryGroupSize, RewardClaimableSeasonCount:def.RewardClaimableSeasonCount, RewardDurationMin:def.RewardDurationMin,
-      SeparateByUserTags:def.SeparateByUserTags, NoWindow:def.NoWindow, IsRelationShipContent:def.IsRelationShipContent,
-      ActiveRankBoardRegister:def.ActiveRankBoardRegister, SetScoreType:def.SetScoreType, FreezeProfileCache:def.FreezeProfileCache,
-      RegisterBlockedMin:regBlockedMin, FillInLastGroupAfterRegisterBlockedMin:fillLast,
-      CategoryIds:def.CategoryIds, Description:((fdef&&fdef.name)||barName(arr[0])), CreatedAt:nowISO,
-      EType:"TournamentContent", PK, PKObj:{GameTitle:def.GameTitle}, SK:cid, SKObj:{ContentId:cid}, TTL:null, UK:`${PK}|${cid}`
-    });
+    const liveRec=liveMap.get(cid);
+    const liveIsSched = !!(liveRec && liveRec.SeasonSetting && Array.isArray(liveRec.SeasonSetting.CustomSeasonDatas));
+    if(inherit && liveIsSched){
+      // (b) 기존 컨텐츠 = 운영툴 설정값 그대로 상속. 시즌(CustomSeasonDatas)·PeriodValue 만 새로 씀
+      inherited.push(cid);
+      const rec=Object.assign({}, liveRec);
+      rec.SeasonSetting=Object.assign({}, liveRec.SeasonSetting, { PeriodValue:days0, CustomSeasonDatas:seasons });
+      sched.push(rec);
+    } else {
+      sched.push({
+        SeasonSetting:{ StartAt:startAt, EndAt:FIXED_END, PeriodUnit:6, PeriodValue:days0, IrregularPeriodMinutes:null, CustomSeasonDatas:seasons },
+        MaxEntryGroupSize:def.MaxEntryGroupSize, RewardClaimableSeasonCount:def.RewardClaimableSeasonCount, RewardDurationMin:def.RewardDurationMin,
+        SeparateByUserTags:def.SeparateByUserTags, NoWindow:def.NoWindow, IsRelationShipContent:def.IsRelationShipContent,
+        ActiveRankBoardRegister:def.ActiveRankBoardRegister, SetScoreType:def.SetScoreType, FreezeProfileCache:def.FreezeProfileCache,
+        RegisterBlockedMin:regBlockedMin, FillInLastGroupAfterRegisterBlockedMin:fillLast,
+        CategoryIds:def.CategoryIds, Description:((fdef&&fdef.name)||barName(arr[0])), CreatedAt:nowISO,
+        EType:"TournamentContent", PK, PKObj:{GameTitle:def.GameTitle}, SK:cid, SKObj:{ContentId:cid}, TTL:null, UK:`${PK}|${cid}`
+      });
+    }
   }
-  let base=[]; const bt=(state.tourneyBase||"").trim();
-  if(bt){ const parsed=JSON.parse(bt); if(!Array.isArray(parsed)) throw new Error("베이스 JSON 이 배열이 아닙니다"); base=parsed; }
   // ContentId(SK) 중복 시 스케쥴 토너 우선
   const map=new Map();
   for(const r of base){ const k=(r&&r.SK)||(r&&r.SKObj&&r.SKObj.ContentId); if(k) map.set(k,r); else map.set("__"+map.size, r); }
   for(const r of sched) map.set(r.SK, r);
-  return { records:[...map.values()], baseCount:base.length, typeCount:sched.length, seasonTotal, noKey, durWarn };
+  return { records:[...map.values()], baseCount:base.length, typeCount:sched.length, seasonTotal, noKey, durWarn, inherited, inherit };
 }
 // 오프라인 테스트용 슬림 추출 (생성 스케쥴 토너만, 5필드)
 function buildOfflineTournamentJSON(def, fromDate){
@@ -1680,6 +1695,22 @@ function verifyTourneyAgainstLive(liveRecords, genRecords, today){
     const fL=ls.filter(x=>x.s>today).length, fG=gs.filter(x=>x.s>today).length;
     if(fL!==fG) notes.push({sk, type:"미래 시즌 변동", detail:`운영툴 ${fL}개 → 추출 ${fG}개 (미래는 변경 허용)`});
   }
+  // (a) 설정값 차이 검증 — 기존 컨텐츠의 설정이 운영툴과 달라지는지 (시즌 날짜 외)
+  const SETTING_KEYS=["MaxEntryGroupSize","RewardClaimableSeasonCount","RewardDurationMin","SeparateByUserTags","NoWindow","IsRelationShipContent","ActiveRankBoardRegister","SetScoreType","FreezeProfileCache","RegisterBlockedMin","FillInLastGroupAfterRegisterBlockedMin","CategoryIds","Description"];
+  const SS_KEYS=["StartAt","EndAt","PeriodUnit","PeriodValue"];
+  const fmt=v=>Array.isArray(v)?("["+v.join(",")+"]"):(v===null?"null":(v===undefined?"—":String(v)));
+  const same=(a,b)=>JSON.stringify(a===undefined?null:a)===JSON.stringify(b===undefined?null:b);
+  const liveRecMap=new Map(), genRecMap=new Map();
+  for(const r of (liveRecords||[])){ const sk=skOf(r); if(sk&&seasonsOf(r)) liveRecMap.set(sk,r); }
+  for(const r of (genRecords||[])){ const sk=skOf(r); if(sk&&seasonsOf(r)) genRecMap.set(sk,r); }
+  for(const [sk, lr] of liveRecMap){
+    const gr=genRecMap.get(sk); if(!gr) continue;
+    const diffs=[];
+    for(const k of SETTING_KEYS) if(!same(lr[k], gr[k])) diffs.push(`${k}: 운영툴 ${fmt(lr[k])} → 추출 ${fmt(gr[k])}`);
+    for(const k of SS_KEYS){ const a=lr.SeasonSetting&&lr.SeasonSetting[k], b=gr.SeasonSetting&&gr.SeasonSetting[k];
+      if(!same(a,b)) diffs.push(`SeasonSetting.${k}: 운영툴 ${fmt(a)} → 추출 ${fmt(b)}`); }
+    if(diffs.length) notes.push({sk, type:"설정값 변경", detail:diffs.join(" · ")});
+  }
   for(const [sk] of gen) if(!live.has(sk)) notes.push({sk, type:"신규 컨텐츠", detail:"운영툴에 없던 ContentId — 새로 추가됨"});
   return { violations, notes, liveCount:live.size, genCount:gen.size, today };
 }
@@ -1698,6 +1729,7 @@ function fillTourneyForm(){ const d=state.tourneyDefaults||defaultTourneyDefault
   document.getElementById("tn_freeze").checked=!!d.FreezeProfileCache;
   document.getElementById("tn_regblock").value=(d.RegisterBlockedMin==null?0:d.RegisterBlockedMin);
   document.getElementById("tn_filllast").value=(d.FillInLastGroupAfterRegisterBlockedMin?"1":"0");
+  document.getElementById("tn_inherit").checked=(d.InheritLive!==false);
   document.getElementById("tn_base").value=state.tourneyBase||"";
   document.getElementById("tn_from").value=state.tourneyFromDate||"";
   document.getElementById("tn_status").textContent="";
@@ -1716,6 +1748,7 @@ function readTourneyForm(){
     PeriodUnit:6, // 스케쥴 토너 = 항상 Custom(6)
     RegisterBlockedMin:parseInt(document.getElementById("tn_regblock").value,10)||0,
     FillInLastGroupAfterRegisterBlockedMin:document.getElementById("tn_filllast").value==="1",
+    InheritLive:document.getElementById("tn_inherit").checked,
     NoWindow:document.getElementById("tn_nowin").checked,
     IsRelationShipContent:document.getElementById("tn_rel").checked,
     ActiveRankBoardRegister:document.getElementById("tn_rank").checked,
@@ -1784,6 +1817,7 @@ function runTourneyVerify(){
   return v;
 }
 document.getElementById("tn_check").addEventListener("click",runTourneyVerify);
+document.getElementById("tn_inherit").addEventListener("change",()=>{ persistTourneyForm(); runTourneyVerify(); if(document.getElementById("tn_offbox").open) offCalc(); });
 document.getElementById("tn_base").addEventListener("change",runTourneyVerify);
 document.getElementById("tn_from").addEventListener("change",()=>{ runTourneyVerify(); if(document.getElementById("tn_offbox").open) offCalc(); });
 document.getElementById("tn_cancel").addEventListener("click",()=>{ persistTourneyForm(); tourneyDlg.close(); });
