@@ -2224,25 +2224,31 @@ function renderScheduleCanvas(A,B,title,dayW){
   // 트랙 블록 배경 (교차 톤)
   let ty=bodyY, alt=0;
   for(const t of types){ const bh=blockH(t); ctx.fillStyle=(alt%2?"#f6f8fa":"#fdfefe"); ctx.fillRect(gridX,ty,gridW,bh); ty+=bh; alt++; }
-  // 주말/오늘 세로 tint (바디 전체, 바 아래)
-  for(let i=0;i<N;i++){ const d=parseD(addDays(A,i)), w=d.getUTCDay(), cx=gridX+i*dayW;
-    if(iso(d)===today){ ctx.fillStyle="rgba(255,206,0,.15)"; ctx.fillRect(cx,bodyY,dayW,bodyH); }
-    else if(w===0){ ctx.fillStyle="rgba(214,49,59,.05)"; ctx.fillRect(cx,bodyY,dayW,bodyH); }
-    else if(w===6){ ctx.fillStyle="rgba(45,108,223,.05)"; ctx.fillRect(cx,bodyY,dayW,bodyH); }
+  // 날짜 헤더 — 편집기 `.day-cell` 과 동일하게 3줄(일자 16px / 요일 / N月).
+  // 색·크기·배경은 편집기 CSS 값을 그대로 옮긴 것이므로, 저기를 바꾸면 여기도 같이 바꿔야 한다.
+  ctx.fillStyle="#f0f1f4"; ctx.fillRect(gridX,headY,gridW,headerH);
+  for(let i=0;i<N;i++){ const d=parseD(addDays(A,i)), w=d.getUTCDay(), cx=gridX+i*dayW, cxm=cx+dayW/2;
+    const isT=iso(d)===today, first=d.getUTCDate()===1, wend=(w===0||w===6);
+    if(isT){ ctx.fillStyle="#ffe08a"; ctx.fillRect(cx,headY,dayW,headerH); }          // .day-cell.today
+    else if(wend){ ctx.fillStyle="#fafbe9"; ctx.fillRect(cx,headY,dayW,headerH); }    // .day-cell.weekend
+    ctx.textAlign="center"; ctx.textBaseline="alphabetic";
+    ctx.fillStyle=isT?"#b8740a":(w===6?"#2d6cdf":w===0?"#d6313b":"#2a2f36");         // .dnum (+sat/sun/today)
+    ctx.font=`${first?900:700} 16px ${FONT}`; ctx.fillText(String(d.getUTCDate()), cxm, headY+16.5);
+    ctx.fillStyle=(w===6?"#2d6cdf":w===0?"#d6313b":"#7a8290");                        // .dow
+    ctx.font=`700 10px ${FONT}`; ctx.fillText(DOW_KO[w], cxm, headY+29);
+    ctx.fillStyle=first?"#444":"#8b929c";                                             // .ddate (+month1)
+    ctx.font=`${first?800:600} 11px ${FONT}`; ctx.fillText((d.getUTCMonth()+1)+"月", cxm, headY+41);
+    if(isT){ ctx.strokeStyle="#f5a623"; ctx.lineWidth=2; ctx.strokeRect(cx+1,headY+1,dayW-2,headerH-2); } // inset 2px
   }
-  // 날짜 헤더 (풀폭)
-  ctx.fillStyle="#eef0f3"; ctx.fillRect(gridX,headY,gridW,headerH);
-  for(let i=0;i<N;i++){ const d=parseD(addDays(A,i)), w=d.getUTCDay(), cx=gridX+i*dayW;
-    if(iso(d)===today){ ctx.fillStyle="#fff2b8"; ctx.fillRect(cx,headY,dayW,headerH); }
-    else if(w===0){ ctx.fillStyle="#fdeeee"; ctx.fillRect(cx,headY,dayW,headerH); }
-    else if(w===6){ ctx.fillStyle="#ebf1fd"; ctx.fillRect(cx,headY,dayW,headerH); }
-    ctx.fillStyle=(w===0?"#d6313b":w===6?"#2d6cdf":"#333"); ctx.font=`${d.getUTCDate()===1?700:600} 13px ${FONT}`; ctx.textBaseline="alphabetic"; ctx.textAlign="center";
-    ctx.fillText(String(d.getUTCDate()), cx+dayW/2, headY+20);
-    ctx.fillStyle="#a7afbd"; ctx.font=`500 9px ${FONT}`; ctx.fillText((d.getUTCMonth()+1)+"월", cx+dayW/2, headY+34);
-  }
-  // 세로 그리드라인 (헤더+바디)
-  ctx.strokeStyle="#e3e6ea"; ctx.lineWidth=1;
+  // 세로 그리드라인 (헤더+바디) — 편집기 .day-cell border-right
+  ctx.strokeStyle="#e2e4e8"; ctx.lineWidth=1;
   for(let i=0;i<=N;i++){ const cx=gridX+i*dayW; ctx.beginPath(); ctx.moveTo(cx+.5,headY); ctx.lineTo(cx+.5,bodyBottom); ctx.stroke(); }
+  // 매월 1일 경계선 (편집기 .day-cell.month1 border-left)
+  ctx.strokeStyle="#b9bdc4"; ctx.lineWidth=2;
+  for(let i=0;i<N;i++){ if(parseD(addDays(A,i)).getUTCDate()!==1) continue; const cx=gridX+i*dayW;
+    ctx.beginPath(); ctx.moveTo(cx+1,headY); ctx.lineTo(cx+1,bodyBottom); ctx.stroke(); }
+  // 헤더 아래 경계 (편집기 .day-header border-bottom)
+  ctx.strokeStyle="#c4c8cd"; ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(gridX,bodyY-.5); ctx.lineTo(gridX+gridW,bodyY-.5); ctx.stroke();
   // 트랙 블록: 이름 미니헤더 + 바
   ty=bodyY; ctx.textBaseline="middle";
   for(const t of types){ const bh=blockH(t);
@@ -2262,6 +2268,8 @@ function renderScheduleCanvas(A,B,title,dayW){
     }
     ty+=bh; ctx.strokeStyle="#dfe3e8"; ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(gridX,ty-.5); ctx.lineTo(gridX+gridW,ty-.5); ctx.stroke();
   }
+  // 오늘 세로선 (편집기 .today-stripe — 막대 위에 그린다)
+  { const off=daysBetween(A,today); if(off>=0 && off<N){ ctx.fillStyle="#f5a623"; ctx.fillRect(gridX+off*dayW,bodyY,2,bodyH); } }
   ctx.strokeStyle="#ccd1d8"; ctx.lineWidth=1; ctx.strokeRect(gridX+.5,headY+.5,gridW,headerH+bodyH);
   return cv;
 }
