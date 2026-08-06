@@ -358,7 +358,7 @@
       <div class="row" id="dv_saverow" style="display:none"><label>파일명</label><input id="dv_name" type="text" placeholder="v1.4.1.json"></div>
       <div class="meta" id="dv_status" style="min-height:14px"></div>
       <div class="actions">
-        <div><button type="button" id="dv_up">⬆ 상위 폴더</button> <button type="button" id="dv_local">💻 로컬 파일</button></div>
+        <div><button type="button" id="dv_up">⬆ 상위 폴더</button> <button type="button" id="dv_web" title="지금 보고 있는 폴더를 drive.google.com 에서 열기 (새 탭)">🌐 웹에서 열기</button> <button type="button" id="dv_local">💻 로컬 파일</button></div>
         <div class="right"><button type="button" id="dv_cancel">닫기</button><button type="button" class="primary" id="dv_saveHere" style="display:none">이 폴더에 저장</button></div>
       </div>
     </form>
@@ -1486,6 +1486,12 @@ document.getElementById("dv_list").addEventListener("click",async e=>{
   }catch(err){ dvSetStatus("열기 실패: "+err.message); }
 });
 document.getElementById("dv_up").addEventListener("click",async()=>{ if(!dvStack.length){ dvSetStatus("루트 폴더입니다."); return; } dvCwd=dvStack.pop(); dvSetStatus(""); await dvRender(); });
+// 🌐 지금 보고 있는 Drive 폴더를 웹에서 열기 (새 탭). 아직 목록을 못 그렸으면 루트 폴더로.
+document.getElementById("dv_web").addEventListener("click",()=>{
+  const id=(dvCwd&&dvCwd.id)||driveRootId();
+  if(!id){ dvSetStatus("폴더 ID 를 알 수 없습니다 — ⚙ 에서 루트 폴더 ID 를 확인하세요."); return; }
+  window.open("https://drive.google.com/drive/folders/"+encodeURIComponent(id), "_blank", "noopener");
+});
 document.getElementById("dv_cancel").addEventListener("click",()=>driveDlg.close());
 document.getElementById("dv_local").addEventListener("click",()=>{ driveDlg.close(); if(dvMode==="saveas") writeProjAs(); else localOpenProj(); });
 document.getElementById("dv_saveHere").addEventListener("click",async()=>{
