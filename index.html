@@ -841,6 +841,11 @@ function renderInner(){
 // ---------- 날짜 메모 (말풍선) ----------
 // state.dateNotes = { "YYYY-MM-DD": "텍스트" }. **실제 달력 날짜**에 붙는다 —
 // 릴리즈일 같은 현실 일정이므로 시작일 재배치(reanchorTo)로 스케쥴이 움직여도 따라가지 않는다.
+// 말풍선 폭은 **실제 측정**한다. 글자수로 어림하면(영문·숫자가 섞이면 특히) 실제보다 훨씬 넓게 잡혀
+// 겹치지도 않는 메모가 아랫줄로 밀려났다. 좌우 padding 9 + border 1 = 20.
+const _noteMeas=document.createElement("canvas").getContext("2d");
+function noteBubbleW(text){ _noteMeas.font=`700 11px "Apple SD Gothic Neo","Malgun Gothic",sans-serif`;
+  return _noteMeas.measureText(String(text||"")).width+20; }
 function noteRowHTML(startDay, endDay, bandW){
   const notes=state.dateNotes||{}, items=[];
   for(let i=startDay;i<=endDay;i++){ const ds=iso(dayToDate(i)); const t=notes[ds]; if(t) items.push({i, ds, text:t}); }
@@ -848,7 +853,7 @@ function noteRowHTML(startDay, endDay, bandW){
   const LINE_H=23, BUB_H=18;
   const lineEnd=[];                                   // 줄별로 마지막 말풍선의 오른쪽 끝 x
   for(const it of items){
-    const w=Math.max(state.dayWidth, it.text.length*13+24);   // 대략 폭(한글 기준 넉넉히) — 겹침 방지용 추정
+    const w=noteBubbleW(it.text);
     const x=(it.i-startDay)*state.dayWidth + state.dayWidth/2;
     let li=0; while(li<lineEnd.length && lineEnd[li] > x-w/2-6) li++;
     lineEnd[li]=x+w/2; it.line=li; it.x=x;
@@ -907,11 +912,12 @@ document.addEventListener("scroll", hideWarnPopup, true);
 // ---------- 막대 툴팁 (이름·타입·메모·DefKey) ----------
 // 막대는 자주 다시 그려지므로 요소에 직접 붙이지 않고 document 위임으로 처리한다.
 const barTip=document.getElementById("barTip");
-function barDefKeyInfo(b){                    // 타입에 따라 어느 DefKey 를 보여줄지
+// 타입에 따라 어느 DefKey 를 읽을지만 갈린다. 라벨은 「DefKey」 한 단어 —
+// 어느 쪽인지는 바로 윗줄 「타입」이 말해주고, 길면 라벨 칸에서 두 줄로 접힌다.
+function barDefKeyInfo(b){
   const d=defOf(b);
-  return barType(b)==="토너먼트"
-    ? {label:"토너 DefKey", val:(d&&d.tourneyDefKey)||""}
-    : {label:"이벤트 DefKey", val:(d&&d.exportKey)||""};
+  return barType(b)==="토너먼트" ? {label:"DefKey", val:(d&&d.tourneyDefKey)||""}
+                                 : {label:"DefKey", val:(d&&d.exportKey)||""};
 }
 function moveBarTip(x,y){
   const r=barTip.getBoundingClientRect();
