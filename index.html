@@ -145,7 +145,10 @@
   .chip .reord button:hover { color:#2d6cdf; }
   .chip.reord-over { border-top:2px solid #2d6cdf; }
 
-  .cntgrp { padding:6px 12px 4px; font-size:11px; font-weight:700; color:#8a92a0; background:#f7f8fa; border-bottom:1px solid #eef0f3; position:sticky; top:0; }
+  .cntgrp { display:flex; justify-content:space-between; align-items:baseline; gap:8px; padding:6px 12px 5px; font-size:11px; font-weight:700; color:#8a92a0; background:#f7f8fa; border-bottom:1px solid #eef0f3; position:sticky; top:0; }
+  .cntgrp .gsum { color:#5b6472; font-size:12px; white-space:nowrap; }
+  .cntgrp .gsum .gk { color:#a7afbd; font-weight:600; font-size:11px; }
+  .cnttot { display:flex; justify-content:space-between; padding:9px 12px; background:#eef5ff; border-top:1px solid #cfe0f7; font-size:13px; font-weight:700; color:#1f5fbf; position:sticky; bottom:0; }
   .cntrow { display:flex; align-items:center; gap:8px; padding:8px 12px; border-bottom:1px solid #f1f3f6; font-size:13px; }
   .cntrow .dot { width:11px; height:11px; border-radius:3px; flex:0 0 auto; }
   .cntrow .cn { flex:1; font-weight:600; color:#2a2f36; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
@@ -875,10 +878,24 @@ function scheduleCounts(fromDate, toDate){
   const list=[...rows.values()].sort((a,b)=>
     a.type!==b.type ? String(a.type).localeCompare(String(b.type))
                     : (b.count-a.count || String(a.name).localeCompare(String(b.name))));
-  return {list, total, kinds:list.length, unlinked, from:fromDate||"", to:toDate||""};
+  // 카테고리(이벤트 타입)별 소계 — list 와 같은 순서. 소계의 합 = total 이어야 한다.
+  const groups=[]; const gi=new Map();
+  for(const r of list){
+    let g=gi.get(r.type);
+    if(!g){ g={type:r.type, count:0, kinds:0}; gi.set(r.type,g); groups.push(g); }
+    g.count+=r.count; g.kinds++;
+  }
+  return {list, groups, total, kinds:list.length, unlinked, from:fromDate||"", to:toDate||""};
 }
 function countsTSV(res){
-  return res.list.map(r=>[r.type, r.name, r.count].join("\t")).join("\r\n");
+  const lines=[]; let lastType=null;
+  for(const r of res.list){
+    if(lastType!==null && r.type!==lastType){ const g=res.groups.find(x=>x.type===lastType); lines.push([lastType,"소계",g.count].join("\t")); }
+    lines.push([r.type, r.name, r.count].join("\t")); lastType=r.type;
+  }
+  if(lastType!==null){ const g=res.groups.find(x=>x.type===lastType); lines.push([lastType,"소계",g.count].join("\t")); }
+  if(res.total) lines.push(["","합계",res.total].join("\t"));
+  return lines.join("\r\n");
 }
 const cntDlg=document.getElementById("cntDlg");
 function runCount(){
@@ -890,9 +907,11 @@ function runCount(){
   if(!res.total){ box.innerHTML=`<div style="padding:14px;color:#9aa0a8">이 기간에 시작하는 스케쥴이 없습니다.</div>`; st.textContent=""; return res; }
   let h="", lastType=null;
   for(const r of res.list){
-    if(r.type!==lastType){ h+=`<div class="cntgrp">${escapeHtml(r.type)}</div>`; lastType=r.type; }
+    if(r.type!==lastType){ const g=res.groups.find(x=>x.type===r.type);
+      h+=`<div class="cntgrp"><span>${escapeHtml(r.type)}</span><span class="gsum">${g.count}개 <span class="gk">· ${g.kinds}종</span></span></div>`; lastType=r.type; }
     h+=`<div class="cntrow"><span class="dot" style="background:${r.color}"></span><span class="cn">${escapeHtml(r.name)}${r.linked?"":' <span style="color:#c88;font-size:11px">(프리셋 없음)</span>'}</span><span class="cc">${r.count}개</span></div>`;
   }
+  h+=`<div class="cnttot"><span>전체 합계</span><span>${res.total}개</span></div>`;
   box.innerHTML=h;
   st.textContent=`${A} ~ ${B} · 종류 ${res.kinds}개 · 합계 ${res.total}개`+(res.unlinked?` · ⚠ 프리셋 없는 막대 ${res.unlinked}개 포함`:"");
   return res;
