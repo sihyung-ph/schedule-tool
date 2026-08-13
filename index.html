@@ -161,7 +161,10 @@
   .note-bubble:hover { background:#ffe9a8; border-color:#c9a53c; }
   .note-bubble::after { content:""; position:absolute; left:50%; bottom:-5px; margin-left:-4px; width:0; height:0; border-left:4px solid transparent; border-right:4px solid transparent; border-top:5px solid #e0be55; }
   .note-stem { position:absolute; width:0; border-left:1px dashed #e0be55; z-index:1; pointer-events:none; }
+  .day-cell { position: relative; }
   .day-cell.hasnote { box-shadow: inset 0 -3px 0 #e0be55; }
+  .day-cell.hastip::after { content:""; position:absolute; top:2px; right:2px; width:6px; height:6px; border-radius:50%; background:#5b8def; box-shadow:0 0 0 1px #fff; }
+  .day-cell.hastip { cursor:help; }
 
   .bar-tip { position:fixed; z-index:1002; background:#232a33; color:#f2f5f8; border-radius:8px; box-shadow:0 6px 24px rgba(0,0,0,.3); padding:9px 12px; font-size:12px; line-height:1.5; max-width:340px; pointer-events:none; display:none; }
   .bar-tip.show { display:block; }
@@ -343,8 +346,8 @@
       <h3>ℹ 라이브 검증 — 무엇을 확인하나</h3>
       <div class="meta">운영툴 임포트는 ContentId 레코드를 <b>통째로 교체</b>합니다. 그래서 이미 서비스 중인 시즌이 사라지거나 바뀌면 사고가 납니다. 이 검증은 그 사고를 추출 전에 잡습니다.<br>추출은 「이 날짜부터」 <b>앞의 기존 시즌을 그대로 이어받아</b> 뒤에 새 시즌을 붙입니다 — 과거를 덮어쓰지 않습니다.</div>
 
-      <div class="vinfo-sec"><div class="vinfo-h">기준: “도래한 시즌”</div>
-        <div><b>시작일 ≤ 오늘</b>(<span id="vi_today"></span>)인 시즌 = 이미 시작했거나 끝난 시즌 → <b>절대 불변</b>.<br>시작일이 미래인 시즌 = 변경·삭제·추가 <b>모두 자유</b>.</div></div>
+      <div class="vinfo-sec"><div class="vinfo-h">기준: “도래한 시즌” = <b>오늘 + 1일</b>까지</div>
+        <div><b>시작일 ≤ <span id="vi_arrived"></span></b>(오늘 <span id="vi_today"></span> + 1일)인 시즌 → <b>절대 불변</b>.<br>게임이 <b>하루 뒤 일정까지 UpComing 으로 미리 노출</b>하므로, 내일 시작하는 시즌은 이미 플레이어에게 보인 상태입니다.<br>시작일이 <b>모레 이후</b>인 시즌 = 변경·삭제·추가 <b>모두 자유</b>.</div></div>
 
       <div class="vinfo-sec"><div class="vinfo-h bad">❌ 위반 — 추출 시 확인창으로 막습니다</div>
         <table class="vinfo-t">
@@ -593,8 +596,9 @@
   <dialog id="noteDlg">
     <form method="dialog" class="dlg" style="width:min(94vw,380px)">
       <h3>📌 날짜 메모</h3>
-      <div class="meta" style="margin:-6px 0 10px">날짜 <b id="n_date"></b> 에 말풍선으로 항상 표시됩니다. 비우고 저장하면 지워집니다.</div>
-      <div class="row"><input id="n_text" type="text" placeholder="예: v.1.5 업데이트" style="flex:1"></div>
+      <div class="meta" style="margin:-6px 0 10px">날짜 <b id="n_date"></b> 의 메모입니다. <b>두 가지를 함께</b> 넣을 수 있고, 비우고 저장하면 그 항목만 지워집니다.</div>
+      <div class="imgf" style="margin-bottom:4px"><label>💬 말풍선 메모 <span style="color:#888;font-weight:400">— 항상 보임</span></label><input id="n_text" type="text" placeholder="예: v.1.5 업데이트" style="width:100%;box-sizing:border-box"></div>
+      <div class="imgf" style="margin-bottom:4px"><label>🔎 툴팁 메모 <span style="color:#888;font-weight:400">— 날짜에 커서를 올리면 보임</span></label><textarea id="n_tip" rows="3" placeholder="길게 적어도 됩니다. 화면을 차지하지 않습니다." style="width:100%;box-sizing:border-box;padding:5px 7px;border:1px solid #c4c8cd;border-radius:5px;font-size:13px;resize:vertical;font-family:inherit"></textarea></div>
       <div class="actions">
         <button type="button" class="danger" id="n_del">삭제</button>
         <div class="right"><button type="button" id="n_cancel">취소</button><button type="button" class="primary" id="n_ok">저장</button></div>
@@ -825,8 +829,8 @@ function renderInner(){
     html += `<div class="day-header"><div class="corner">트랙 \\ 날짜</div><div class="day-cells">`;
     for (let i=startDay;i<=endDay;i++){ const d=dayToDate(i); const isT=iso(d)===today; const w=d.getUTCDay();
       const cls=(isWeekend(d)?" weekend":"")+(d.getUTCDate()===1?" month1":"")+(isT?" today":"")+(w===6?" sat":"")+(w===0?" sun":"");
-      const ds=iso(d), hasNote=!!(state.dateNotes||{})[ds];
-      html += `<div class="day-cell${cls}${hasNote?" hasnote":""}" data-date="${ds}" title="더블클릭 = 이 날짜에 메모"><div class="dnum">${d.getUTCDate()}</div><div class="dow">${DOW_KO[w]}</div><div class="ddate">${d.getUTCMonth()+1}月</div></div>`; }
+      const ds=iso(d), hasNote=!!(state.dateNotes||{})[ds], hasTip=!!(state.dateTips||{})[ds];
+      html += `<div class="day-cell${cls}${hasNote?" hasnote":""}${hasTip?" hastip":""}" data-date="${ds}" title="더블클릭 = 이 날짜에 메모"><div class="dnum">${d.getUTCDate()}</div><div class="dow">${DOW_KO[w]}</div><div class="ddate">${d.getUTCMonth()+1}月</div></div>`; }
     html += `</div></div>`;
     html += noteRowHTML(startDay, endDay, bandW);
     if (!types.length) html += `<div style="padding:14px;color:#bbb">정의를 추가하면 트랙이 생깁니다.</div>`;
@@ -963,23 +967,27 @@ const noteDlg=document.getElementById("noteDlg"); let editingNoteDate=null;
 function openNote(ds){
   if(!ds) return;
   editingNoteDate=ds;
-  const d=parseD(ds), cur=(state.dateNotes||{})[ds]||"";
+  const d=parseD(ds), cur=(state.dateNotes||{})[ds]||"", tip=(state.dateTips||{})[ds]||"";
   document.getElementById("n_date").textContent=`${d.getUTCFullYear()}.${d.getUTCMonth()+1}.${d.getUTCDate()} (${DOW_KO[d.getUTCDay()]})`;
   document.getElementById("n_text").value=cur;
-  document.getElementById("n_del").style.display=cur?"":"none";
+  document.getElementById("n_tip").value=tip;
+  document.getElementById("n_del").style.display=(cur||tip)?"":"none";
   noteDlg.showModal(); setTimeout(()=>document.getElementById("n_text").select(),0);
 }
-function saveNote(text){
+function saveNote(text, tip){
   pushHistory();
   if(!state.dateNotes) state.dateNotes={};
-  const t=String(text||"").trim();
+  if(!state.dateTips)  state.dateTips={};
+  const t=String(text||"").trim(), p=String(tip||"").trim();
   if(t) state.dateNotes[editingNoteDate]=t; else delete state.dateNotes[editingNoteDate];
+  if(p) state.dateTips[editingNoteDate]=p;  else delete state.dateTips[editingNoteDate];
   save(); render(); noteDlg.close();
 }
-document.getElementById("n_ok").addEventListener("click",()=>saveNote(document.getElementById("n_text").value));
-document.getElementById("n_del").addEventListener("click",()=>saveNote(""));
+const readNoteForm=()=>[document.getElementById("n_text").value, document.getElementById("n_tip").value];
+document.getElementById("n_ok").addEventListener("click",()=>saveNote(...readNoteForm()));
+document.getElementById("n_del").addEventListener("click",()=>saveNote("",""));
 document.getElementById("n_cancel").addEventListener("click",()=>noteDlg.close());
-document.getElementById("n_text").addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); saveNote(e.target.value); } });
+document.getElementById("n_text").addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); saveNote(...readNoteForm()); } });
 
 function barSeg(b, startDay, endDay){
   const s=dayIndex(b.startDate), e=s+b.days;
@@ -1025,10 +1033,21 @@ function showBarTip(b,x,y){
   barTip.classList.add("show"); moveBarTip(x,y);
 }
 function hideBarTip(){ barTip.classList.remove("show"); }
+// 날짜 툴팁 메모 — 말풍선(항상 보임)과 별개로 한 날짜에 같이 넣을 수 있다. 같은 툴팁 요소를 쓴다.
+function showDateTip(ds,x,y){
+  const txt=(state.dateTips||{})[ds]; if(!txt) return false;
+  const d=parseD(ds), bub=(state.dateNotes||{})[ds];
+  barTip.innerHTML=`<div class="tt-name">📌 ${d.getUTCMonth()+1}월 ${d.getUTCDate()}일 (${DOW_KO[d.getUTCDay()]})</div>`
+    + (bub?`<div class="tt-row"><span class="tt-k">말풍선</span><span class="tt-v">${escapeHtml(bub)}</span></div>`:"")
+    + `<div class="tt-row"><span class="tt-k">메모</span><span class="tt-v">${escapeHtml(txt)}</span></div>`;
+  barTip.classList.add("show"); moveBarTip(x,y); return true;
+}
 document.addEventListener("pointerover", e=>{
   if(e.pointerType==="touch") return;
-  const el=e.target.closest && e.target.closest(".bar"); if(!el){ hideBarTip(); return; }
   if(e.buttons) return;                                   // 드래그 중엔 방해 안 되게
+  const cell=e.target.closest && e.target.closest(".day-cell");
+  if(cell){ if(!showDateTip(cell.dataset.date, e.clientX, e.clientY)) hideBarTip(); return; }
+  const el=e.target.closest && e.target.closest(".bar"); if(!el){ hideBarTip(); return; }
   const b=state.bars.find(x=>x.id===el.dataset.bar); if(!b){ hideBarTip(); return; }
   showBarTip(b, e.clientX, e.clientY);
 });
@@ -1503,7 +1522,8 @@ function migrate(){ // 부스트 → 가챠부스트 (타입 분리 이전 데�
   if(!Array.isArray(state.palette)||!state.palette.length) state.palette=DEFAULT_PALETTE.slice();
   if(!Array.isArray(state.plans)) state.plans=[];
   if(!Array.isArray(state.planInstances)) state.planInstances=[];
-  if(!state.dateNotes || typeof state.dateNotes!=="object") state.dateNotes={};   // 날짜 메모 (구 편집본엔 없음)
+  if(!state.dateNotes || typeof state.dateNotes!=="object") state.dateNotes={};   // 날짜 메모 — 말풍선 (구 편집본엔 없음)
+  if(!state.dateTips  || typeof state.dateTips !=="object") state.dateTips ={};   // 날짜 메모 — 툴팁 (구 편집본엔 없음)
   state.definitions.forEach(d=>{ if(d.shareWith===undefined) d.shareWith=""; if(d.memo===undefined) d.memo=""; if(!Array.isArray(d.exclusiveWith)) d.exclusiveWith=[]; if(!Array.isArray(d.exportTargets)) d.exportTargets=[]; if(d.exportKey===undefined) d.exportKey=""; if(d.exportEventType===undefined) d.exportEventType=""; if(d.tourneyType===undefined) d.tourneyType=""; if(d.tourneyDefKey===undefined) d.tourneyDefKey=""; if(d.regBlockMin===undefined) d.regBlockMin=""; if(d.fillLastGroup===undefined) d.fillLastGroup=""; });
   if(state.liveGroupStart===undefined) state.liveGroupStart=1;
   if(state.liveIndexStart===undefined) state.liveIndexStart=1;
@@ -2242,9 +2262,12 @@ function buildOfflineTournamentJSON(def, fromDate){
   }
   return { records:out, count:out.length, seasonTotal:out.reduce((a,r)=>a+r.seasons.length,0), noKey };
 }
-// ===== 라이브 훼손 검증 — 도래한 시즌(시작일 ≤ 오늘)은 불변, 미래 시즌은 변경 자유 =====
+// ===== 라이브 훼손 검증 — 도래한 시즌(시작일 ≤ 오늘+1일, UpComing 포함)은 불변, 그 이후는 변경 자유 =====
 // liveRecords = 운영툴 현재 JSON 배열, genRecords = 이번에 추출될 레코드 배열, today = "YYYY-MM-DD"
 function verifyTourneyAgainstLive(liveRecords, genRecords, today){
+  // ⚠️ 라이브 테이블과 동일 — 「도래」 기준은 오늘이 아니라 **오늘+1일**.
+  // 게임이 하루 뒤 일정까지 UpComing 으로 미리 노출하므로 내일 시작 시즌은 이미 플레이어에게 보였다.
+  const arrived=addDays(today,1);
   const dOf=s=>String(s||"").slice(0,10);
   const seasonsOf=r=>{ const cs=r&&r.SeasonSetting&&r.SeasonSetting.CustomSeasonDatas;
     return Array.isArray(cs) ? cs.map(s=>({s:dOf(s.StartAt), e:dOf(s.EndAt)})) : null; };
@@ -2254,23 +2277,23 @@ function verifyTourneyAgainstLive(liveRecords, genRecords, today){
   for(const r of (genRecords||[])){ const sk=skOf(r), ss=seasonsOf(r); if(sk&&ss) gen.set(sk,ss); }
   const violations=[], notes=[];
   for(const [sk, ls] of live){
-    const arrived=ls.filter(x=>x.s<=today);              // 도래한(시작한) 시즌 = 불변 대상
+    const arrivedSeasons=ls.filter(x=>x.s<=arrived);     // 도래한 시즌(오늘+1일까지 시작) = 불변 대상
     const gs=gen.get(sk);
     if(!gs){
-      if(arrived.length) violations.push({sk, type:"컨텐츠 누락", detail:`도래한 시즌 ${arrived.length}개가 이번 추출에 없음 (${arrived.map(a=>a.s).join(", ")}) — 임포트하면 라이브 기록이 사라짐`});
+      if(arrivedSeasons.length) violations.push({sk, type:"컨텐츠 누락", detail:`도래한 시즌 ${arrivedSeasons.length}개가 이번 추출에 없음 (${arrivedSeasons.map(a=>a.s).join(", ")}) — 임포트하면 라이브 기록이 사라짐`});
       else notes.push({sk, type:"이번 추출에 없음", detail:"도래한 시즌이 없어 영향 없음"});
       continue;
     }
     const gByStart=new Map(gs.map(x=>[x.s,x]));
-    for(const a of arrived){
+    for(const a of arrivedSeasons){
       const g=gByStart.get(a.s);
       if(!g) violations.push({sk, type:"도래 시즌 삭제", detail:`${a.s}~${a.e} 시즌이 이번 추출에 없음`});
       else if(g.e!==a.e) violations.push({sk, type:"도래 시즌 기간 변경", detail:`${a.s} 시즌 종료일: 운영툴 ${a.e} → 추출 ${g.e}`});
     }
     const lStarts=new Set(ls.map(x=>x.s));
-    for(const g of gs) if(g.s<=today && !lStarts.has(g.s))
-      violations.push({sk, type:"과거 시즌 추가", detail:`${g.s}~${g.e} 는 이미 도래한 날짜인데 운영툴엔 없음 (뒤에만 추가 위반)`});
-    const fL=ls.filter(x=>x.s>today).length, fG=gs.filter(x=>x.s>today).length;
+    for(const g of gs) if(g.s<=arrived && !lStarts.has(g.s))
+      violations.push({sk, type:"과거 시즌 추가", detail:`${g.s}~${g.e} 는 이미 도래한 날짜(오늘+1일 이내)인데 운영툴엔 없음 (뒤에만 추가 위반)`});
+    const fL=ls.filter(x=>x.s>arrived).length, fG=gs.filter(x=>x.s>arrived).length;
     if(fL!==fG) notes.push({sk, type:"미래 시즌 변동", detail:`운영툴 ${fL}개 → 추출 ${fG}개 (미래는 변경 허용)`});
   }
   // 시즌 겹침 = 오류. 기존 시즌 이어붙이기(fromDate 앞 보존) 때 경계에 걸친 시즌과 새 시즌이 부딪히면 여기서 걸린다.
@@ -2398,14 +2421,14 @@ function runTourneyVerify(){
   const li=a=>a.map(x=>`<li><code>${escapeHtml(x.sk)}</code> · <b>${escapeHtml(x.type)}</b> — ${escapeHtml(x.detail)}</li>`).join("");
   let html="";
   if(v.violations.length) html+=`<div class="vbox bad"><div class="vhead">❌ 라이브 훼손 위반 ${v.violations.length}건 — 이대로 임포트하면 서비스 데이터가 깨집니다</div><ul>${li(v.violations)}</ul></div>`;
-  else html+=`<div class="vbox ok"><div class="vhead">✅ 위반 없음 — 도래한 시즌(오늘 ${todayISO()} 이전 시작) 모두 그대로 유지됨</div>운영툴 토너 ${v.liveCount}종 · 추출 ${v.genCount}종 비교.</div>`;
+  else html+=`<div class="vbox ok"><div class="vhead">✅ 위반 없음 — 도래한 시즌(${addDays(todayISO(),1)} 까지 시작 = 오늘+1일, UpComing 포함) 모두 그대로 유지됨</div>운영툴 토너 ${v.liveCount}종 · 추출 ${v.genCount}종 비교.</div>`;
   if(v.notes.length) html+=`<div class="vbox warn" style="margin-top:6px"><div class="vhead">ℹ 참고 ${v.notes.length}건 (허용되는 변경)</div><ul>${li(v.notes)}</ul></div>`;
   box.innerHTML=html;
   return v;
 }
 document.getElementById("tn_check").addEventListener("click",runTourneyVerify);
 const vinfoDlg=document.getElementById("vinfoDlg");
-document.getElementById("tn_info").addEventListener("click",()=>{ document.getElementById("vi_today").textContent=todayISO(); if(!vinfoDlg.open) vinfoDlg.showModal(); });
+document.getElementById("tn_info").addEventListener("click",()=>{ document.getElementById("vi_today").textContent=todayISO(); document.getElementById("vi_arrived").textContent=addDays(todayISO(),1); if(!vinfoDlg.open) vinfoDlg.showModal(); });
 document.getElementById("vi_close").addEventListener("click",()=>vinfoDlg.close());
 document.getElementById("tn_inherit").addEventListener("change",()=>{ persistTourneyForm(); runTourneyVerify(); if(document.getElementById("tn_offbox").open) offCalc(); });
 document.getElementById("tn_base").addEventListener("change",runTourneyVerify);
@@ -2586,7 +2609,7 @@ document.getElementById("img_copy").addEventListener("click",()=>{
 
 // ---------- 시드(빈 상태로 시작) ----------
 function seed(){
-  state={ startDate:curMonthFirst(), totalDays:120, dayWidth:30, daysPerRow:60, groupWindowDays:14, palette:DEFAULT_PALETTE.slice(), definitions:[], bars:[], plans:[], planInstances:[], scheduleTemplate:null, dateNotes:{} };
+  state={ startDate:curMonthFirst(), totalDays:120, dayWidth:30, daysPerRow:60, groupWindowDays:14, palette:DEFAULT_PALETTE.slice(), definitions:[], bars:[], plans:[], planInstances:[], scheduleTemplate:null, dateNotes:{}, dateTips:{} };
   nextId=1;
 }
 
