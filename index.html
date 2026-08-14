@@ -145,6 +145,40 @@
   .chip .reord button:hover { color:#2d6cdf; }
   .chip.reord-over { border-top:2px solid #2d6cdf; }
 
+  /* 라이브 검증 시각화 — 운영툴 vs 추출 두 줄 비교 */
+  .cmplegend { display:flex; flex-wrap:wrap; gap:6px 14px; font-size:11px; color:#5b6472; margin-bottom:8px; }
+  .cmplegend span { display:flex; align-items:center; gap:5px; }
+  .cmplegend .sw { width:14px; height:11px; border-radius:3px; border:1px solid rgba(0,0,0,.18); flex:0 0 auto; }
+  .cmpgrid { display:inline-block; min-width:100%; }
+  .cmprow { display:flex; border-bottom:1px solid #eef0f3; }
+  .cmprow.bad { background:#fff6f5; }
+  .cmprow.head { background:#f7f8fa; border-bottom:1px solid #d8dce2; position:sticky; top:0; z-index:6; }
+  .cmplabel { flex:0 0 190px; width:190px; padding:6px 9px; position:sticky; left:0; z-index:5; background:inherit; border-right:1px solid #d8dce2; font-size:11px; line-height:1.35; overflow:hidden; }
+  .cmprow { background:#fff; }
+  .cmplabel b { display:block; font-size:12px; color:#2a2f36; word-break:break-all; }
+  .cmplabel span { color:#8a92a0; }
+  .cmptrack { position:relative; height:44px; flex:0 0 auto; }
+  .cmprow.head .cmptrack { height:22px; }
+  .cmplane { position:relative; height:20px; margin:1px 0; }
+  /* 레인 이름은 가로 스크롤해도 보이게 sticky. 막대 위에 겹치므로 흰 배경을 깔아 둘 다 읽히게 한다. */
+  .cmplane .cmpln { position:sticky; left:0; z-index:4; float:left; font-size:9px; color:#8a92a0; line-height:16px; margin:2px 0 0 2px;
+    background:rgba(255,255,255,.93); border:1px solid #eceff3; border-radius:3px; padding:0 3px; pointer-events:none; }
+  .cmpseg { position:absolute; top:2px; height:16px; border-radius:3px; border:1px solid rgba(0,0,0,.2); }
+  .cmpseg.same { background:#cfe3d4; }
+  .cmpseg.ok-new { background:#9ec5f5; }
+  .cmpseg.ok-changed, .cmpseg.ok-removed { background:#f5d79e; }
+  .cmpseg.violation-changed, .cmpseg.violation-removed, .cmpseg.violation-added { background:#ef8a80; border-color:#b23b30; }
+  .cmpseg.overlap { background-image:repeating-linear-gradient(45deg, rgba(178,59,48,.9) 0 5px, rgba(178,59,48,.5) 5px 10px); border-color:#b23b30; }
+  .cmpnone { position:absolute; left:52px; top:3px; font-size:10px; color:#b9bfc7; font-style:italic; }
+  .cmptick { position:absolute; top:4px; font-size:10px; color:#8a92a0; padding-left:3px; }
+  .cmpmline { position:absolute; top:0; bottom:0; width:1px; background:#dfe3e8; }
+  .cmpnow { position:absolute; top:0; bottom:0; width:2px; background:#f5a623; z-index:3; }
+  .cmpnow span { position:absolute; top:2px; left:3px; font-size:9px; color:#b8740a; font-weight:700; white-space:nowrap; }
+  .cmparr { position:absolute; top:0; bottom:0; width:0; border-left:1px dashed #d6313b; z-index:3; }
+  .cmplegend .sw.nowline { background:linear-gradient(90deg,#f5a623 0 50%,#d6313b 50% 100%); }
+  .cmplegend .sw.overlap { background-image:repeating-linear-gradient(45deg, rgba(178,59,48,.9) 0 4px, rgba(178,59,48,.5) 4px 8px); }
+  .cmpempty { padding:20px; color:#9aa0a8; font-size:13px; }
+
   .cntgrp { display:flex; justify-content:space-between; align-items:baseline; gap:8px; padding:6px 12px 5px; font-size:11px; font-weight:700; color:#8a92a0; background:#f7f8fa; border-bottom:1px solid #eef0f3; position:sticky; top:0; }
   .cntgrp .gsum { color:#5b6472; font-size:12px; white-space:nowrap; }
   .cntgrp .gsum .gk { color:#a7afbd; font-weight:600; font-size:11px; }
@@ -576,6 +610,24 @@
         <button type="button" class="danger" id="d_del">삭제</button>
         <div class="right"><button type="button" id="d_cancel">취소</button><button type="button" class="primary" id="d_ok">저장</button></div>
       </div>
+    </form>
+  </dialog>
+
+  <dialog id="cmpDlg">
+    <form method="dialog" class="dlg" style="width:min(97vw,1360px)">
+      <h3>🔍 라이브 검증 — 기존 일정 vs 이번 추출</h3>
+      <div class="meta" style="margin:-6px 0 8px">토너별로 <b>위=운영툴 현재</b>, <b>아래=이번에 추출될 일정</b>을 같은 날짜 축에 그립니다. 운영툴에 무엇이 얼마나 들어 있었는지 그대로 보이므로, 무엇이 유지되고 무엇이 새로 붙는지 눈으로 확인할 수 있습니다.</div>
+      <div class="cmplegend">
+        <span><i class="sw same"></i>그대로 (문제 없음)</span>
+        <span><i class="sw ok-new"></i>신규 추가 (정상)</span>
+        <span><i class="sw ok-changed"></i>미래 변경·삭제 (허용)</span>
+        <span><i class="sw violation-changed"></i>문제 — 도래분 변경·삭제·추가</span>
+        <span><i class="sw overlap"></i>시즌 겹침</span>
+        <span><i class="sw nowline"></i>오늘 / 도래 경계(+1일)</span>
+      </div>
+      <div id="cmp_body" style="overflow:auto;max-height:60vh;border:1px solid #e0e3e8;border-radius:8px;background:#fff"></div>
+      <div class="meta" id="cmp_status" style="min-height:14px;margin-top:8px"></div>
+      <div class="actions"><div></div><div class="right"><button type="button" class="primary" id="cmp_close">닫기</button></div></div>
     </form>
   </dialog>
 
@@ -2409,6 +2461,94 @@ function persistTourneyForm(){ // 입력 즉시 state 반영 → 취소/닫아�
 tourneyDlg.addEventListener("input", persistTourneyForm);
 tourneyDlg.addEventListener("change", persistTourneyForm);
 // 검증 실행 + 결과 렌더 (추출 다이얼로그 안). 반환: {violations,notes} 또는 null(베이스 없음/파싱실패)
+// ===== 라이브 검증 시각화 — 「운영툴 현재」 vs 「이번 추출」 을 토너별로 나란히 그린다 =====
+// 왜 필요한가: 운영툴에 기존 데이터가 얼마나 어떻게 채워져 있었는지 숫자만으로는 알 수 없다.
+// 두 줄을 같은 날짜 축에 겹쳐 놓으면 «그대로인 것 / 새로 붙는 것 / 문제인 것» 이 한눈에 보인다.
+// status: same(일치) · ok-new(신규, 정상) · ok-changed(미래 변경, 허용) · ok-removed(미래 삭제, 허용)
+//         violation-changed(도래 기간 변경) · violation-removed(도래 삭제) · violation-added(도래 날짜 추가)
+function buildTourneyDiff(liveRecords, genRecords, today){
+  const arrived=addDays(today,1);                       // 도래 기준 = 오늘+1일 (UpComing)
+  const dOf=s=>String(s||"").slice(0,10);
+  const seasonsOf=r=>{ const cs=r&&r.SeasonSetting&&r.SeasonSetting.CustomSeasonDatas;
+    return Array.isArray(cs)?cs.map(s=>({s:dOf(s.StartAt), e:dOf(s.EndAt)})):null; };
+  const skOf=r=>(r&&(r.SK||(r.SKObj&&r.SKObj.ContentId)))||"";
+  const live=new Map(), gen=new Map(), desc=new Map();
+  for(const r of (liveRecords||[])){ const sk=skOf(r); if(!sk) continue; const ss=seasonsOf(r);
+    if(ss) live.set(sk,ss); if(r.Description && !desc.has(sk)) desc.set(sk,r.Description); }
+  for(const r of (genRecords||[])){ const sk=skOf(r); if(!sk) continue; const ss=seasonsOf(r);
+    if(ss) gen.set(sk,ss); if(r.Description) desc.set(sk,r.Description); }
+  let minD="", maxD="";
+  const track=d=>{ if(!d) return; if(!minD||d<minD) minD=d; if(d>maxD) maxD=d; };
+  const cls=(mine, other, isLive)=>{
+    if(!other) return mine.s<=arrived ? (isLive?"violation-removed":"violation-added") : (isLive?"ok-removed":"ok-new");
+    if(other.e!==mine.e) return mine.s<=arrived ? "violation-changed" : "ok-changed";
+    return "same";
+  };
+  const rows=[]; const counts={same:0,"ok-new":0,"ok-changed":0,"ok-removed":0,
+    "violation-changed":0,"violation-removed":0,"violation-added":0,overlap:0};
+  for(const sk of [...new Set([...live.keys(), ...gen.keys()])].sort()){
+    const ls=(live.get(sk)||[]).slice().sort((a,b)=>a.s<b.s?-1:(a.s>b.s?1:0));
+    const gs=(gen.get(sk)||[]).slice().sort((a,b)=>a.s<b.s?-1:(a.s>b.s?1:0));
+    const gBy=new Map(gs.map(x=>[x.s,x])), lBy=new Map(ls.map(x=>[x.s,x]));
+    const liveSegs=ls.map(x=>{ track(x.s); track(x.e); return {s:x.s,e:x.e,status:cls(x,gBy.get(x.s),true)}; });
+    const genSegs =gs.map(x=>{ track(x.s); track(x.e); return {s:x.s,e:x.e,status:cls(x,lBy.get(x.s),false)}; });
+    for(let i=1;i<genSegs.length;i++) if(genSegs[i].s<genSegs[i-1].e){ genSegs[i].overlap=true; genSegs[i-1].overlap=true; }
+    for(const g of genSegs) if(g.overlap) counts.overlap++;
+    for(const seg of liveSegs.concat(genSegs)) if(counts[seg.status]!=null) counts[seg.status]++;
+    rows.push({sk, desc:desc.get(sk)||"", live:liveSegs, gen:genSegs, inLive:live.has(sk), inGen:gen.has(sk)});
+  }
+  const violations=counts["violation-changed"]+counts["violation-removed"]+counts["violation-added"]+counts.overlap;
+  return {rows, from:minD, to:maxD, today, arrived, counts, violations};
+}
+const DIFF_LABEL={ same:"그대로", "ok-new":"신규 추가", "ok-changed":"미래 변경", "ok-removed":"미래 삭제",
+  "violation-changed":"도래 기간 변경", "violation-removed":"도래 삭제", "violation-added":"도래 날짜 추가" };
+const cmpDlg=document.getElementById("cmpDlg");
+function renderTourneyDiff(){
+  const box=document.getElementById("cmp_body"), st=document.getElementById("cmp_status");
+  const raw=(document.getElementById("tn_base").value||"").trim();
+  if(!raw){ box.innerHTML=`<div class="cmpempty">운영툴 현재 JSON 이 비어 있습니다. 위 칸에 붙여넣으면 기존 일정과 나란히 비교해 드립니다.</div>`; st.textContent=""; return; }
+  let live; try{ live=JSON.parse(raw); if(!Array.isArray(live)) throw new Error("배열이 아님"); }
+  catch(e){ box.innerHTML=`<div class="cmpempty">운영툴 JSON 파싱 실패: ${escapeHtml(e.message)}</div>`; st.textContent=""; return; }
+  let res; try{ res=buildTournamentJSON(readTourneyForm(), document.getElementById("tn_from").value||""); }
+  catch(e){ box.innerHTML=`<div class="cmpempty">추출 계산 실패: ${escapeHtml(e.message)}</div>`; st.textContent=""; return; }
+  const d=buildTourneyDiff(live, res.records, todayISO());
+  if(!d.rows.length){ box.innerHTML=`<div class="cmpempty">비교할 시즌이 없습니다.</div>`; st.textContent=""; return; }
+  const N=Math.round((parseD(d.to)-parseD(d.from))/86400000)+1;
+  const dw=Math.max(2, Math.min(14, Math.floor(1160/Math.max(1,N))));
+  const W=N*dw, off=x=>Math.round((parseD(x)-parseD(d.from))/86400000)*dw;
+  // 월 눈금
+  let head="";
+  for(let i=0;i<N;i++){ const dd=parseD(addDays(d.from,i));
+    if(dd.getUTCDate()!==1 && i!==0) continue;
+    head+=`<div class="cmptick" style="left:${i*dw}px">${dd.getUTCMonth()+1}월</div>`;
+    if(i!==0) head+=`<div class="cmpmline" style="left:${i*dw}px"></div>`; }
+  const todayOff=(d.today>=d.from&&d.today<=d.to)?off(d.today):null;
+  const arrOff =(d.arrived>=d.from&&d.arrived<=d.to)?off(d.arrived):null;
+  const seg=(x)=>{ const l=off(x.s), w=Math.max(3, off(x.e)-l);
+    const t=`${x.s} ~ ${x.e} · ${DIFF_LABEL[x.status]||x.status}${x.overlap?" · ⚠ 시즌 겹침":""}`;
+    return `<div class="cmpseg ${x.status}${x.overlap?" overlap":""}" style="left:${l}px;width:${w}px" title="${escapeHtml(t)}"></div>`; };
+  let h=`<div class="cmpgrid" style="--w:${W}px">`;
+  h+=`<div class="cmprow head"><div class="cmplabel"></div><div class="cmptrack" style="width:${W}px">${head}`
+    +(todayOff!=null?`<div class="cmpnow" style="left:${todayOff}px"><span>오늘</span></div>`:"")
+    +(arrOff!=null?`<div class="cmparr" style="left:${arrOff}px"></div>`:"")+`</div></div>`;
+  for(const r of d.rows){
+    const bad=r.live.concat(r.gen).some(x=>/^violation/.test(x.status)||x.overlap);
+    h+=`<div class="cmprow${bad?" bad":""}"><div class="cmplabel"><b>${escapeHtml(r.sk)}</b>${r.desc?`<span>${escapeHtml(r.desc)}</span>`:""}</div><div class="cmptrack" style="width:${W}px">`
+      +`<div class="cmplane"><span class="cmpln">운영툴</span>${r.live.map(seg).join("")}${r.inLive?"":`<span class="cmpnone">기존 없음</span>`}</div>`
+      +`<div class="cmplane"><span class="cmpln">추출</span>${r.gen.map(seg).join("")}${r.inGen?"":`<span class="cmpnone">이번 추출 없음</span>`}</div>`
+      +(todayOff!=null?`<div class="cmpnow" style="left:${todayOff}px"></div>`:"")
+      +(arrOff!=null?`<div class="cmparr" style="left:${arrOff}px"></div>`:"")
+      +`</div></div>`;
+  }
+  h+=`</div>`;
+  box.innerHTML=h;
+  const c=d.counts;
+  st.innerHTML=(d.violations
+      ? `<b style="color:#c0392b">❌ 문제 ${d.violations}곳</b> — 빨간 칸을 확인하세요.`
+      : `<b style="color:#137a51">✅ 문제 없음</b> — 도래한 시즌(${d.arrived} 까지 시작)이 모두 그대로입니다.`)
+    + ` · 그대로 ${c.same}칸 · 신규 ${c["ok-new"]}칸 · 미래 변경 ${c["ok-changed"]+c["ok-removed"]}칸`
+    + ` · 기간 ${d.from} ~ ${d.to}`;
+}
 function runTourneyVerify(){
   const box=document.getElementById("tn_verify"); if(!box) return null;
   const raw=(document.getElementById("tn_base").value||"").trim();
@@ -2426,7 +2566,12 @@ function runTourneyVerify(){
   box.innerHTML=html;
   return v;
 }
-document.getElementById("tn_check").addEventListener("click",runTourneyVerify);
+// 🔍 라이브 검증 = 텍스트 결과 갱신 + **시각화 팝업**. 예전엔 이미 떠 있는 결과를 다시 그릴 뿐이라 눌러도 티가 안 났다.
+document.getElementById("tn_check").addEventListener("click",()=>{
+  persistTourneyForm(); runTourneyVerify(); renderTourneyDiff();
+  if(!cmpDlg.open) cmpDlg.showModal();
+});
+document.getElementById("cmp_close").addEventListener("click",()=>cmpDlg.close());
 const vinfoDlg=document.getElementById("vinfoDlg");
 document.getElementById("tn_info").addEventListener("click",()=>{ document.getElementById("vi_today").textContent=todayISO(); document.getElementById("vi_arrived").textContent=addDays(todayISO(),1); if(!vinfoDlg.open) vinfoDlg.showModal(); });
 document.getElementById("vi_close").addEventListener("click",()=>vinfoDlg.close());
