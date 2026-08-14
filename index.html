@@ -167,6 +167,8 @@
   .cmpseg.same { background:#cfe3d4; }
   .cmpseg.ok-new { background:#9ec5f5; }
   .cmpseg.ok-changed, .cmpseg.ok-removed { background:#f5d79e; }
+  .cmpseg.ok-outrange { background:#e6e9ed; }
+  .cmpseg.violation-moved { background:#ef8a80; border-color:#b23b30; }
   .cmpseg.violation-changed, .cmpseg.violation-removed, .cmpseg.violation-added { background:#ef8a80; border-color:#b23b30; }
   .cmpseg.overlap { background-image:repeating-linear-gradient(45deg, rgba(178,59,48,.9) 0 5px, rgba(178,59,48,.5) 5px 10px); border-color:#b23b30; }
   .cmpnone { position:absolute; left:52px; top:3px; font-size:10px; color:#b9bfc7; font-style:italic; }
@@ -175,8 +177,13 @@
   .cmpnow { position:absolute; top:0; bottom:0; width:2px; background:#f5a623; z-index:3; }
   .cmpnow span { position:absolute; top:2px; left:3px; font-size:9px; color:#b8740a; font-weight:700; white-space:nowrap; }
   .cmparr { position:absolute; top:0; bottom:0; width:0; border-left:1px dashed #d6313b; z-index:3; }
+  /* 범례 칩은 .cmpseg 가 아니라 .sw 라서 색 규칙을 따로 준다 (안 주면 빈 네모로 보임) */
+  .cmplegend .sw.same { background:#cfe3d4; }
+  .cmplegend .sw.ok-new { background:#9ec5f5; }
+  .cmplegend .sw.ok-changed { background:#f5d79e; }
+  .cmplegend .sw.violation-changed { background:#ef8a80; border-color:#b23b30; }
   .cmplegend .sw.nowline { background:linear-gradient(90deg,#f5a623 0 50%,#d6313b 50% 100%); }
-  .cmplegend .sw.overlap { background-image:repeating-linear-gradient(45deg, rgba(178,59,48,.9) 0 4px, rgba(178,59,48,.5) 4px 8px); }
+  .cmplegend .sw.overlap { background-image:repeating-linear-gradient(45deg, rgba(178,59,48,.9) 0 4px, rgba(178,59,48,.5) 4px 8px); border-color:#b23b30; }
   .cmpempty { padding:20px; color:#9aa0a8; font-size:13px; }
 
   .cntgrp { display:flex; justify-content:space-between; align-items:baseline; gap:8px; padding:6px 12px 5px; font-size:11px; font-weight:700; color:#8a92a0; background:#f7f8fa; border-bottom:1px solid #eef0f3; position:sticky; top:0; }
@@ -615,15 +622,15 @@
 
   <dialog id="cmpDlg">
     <form method="dialog" class="dlg" style="width:min(97vw,1360px)">
-      <h3>🔍 라이브 검증 — 기존 일정 vs 이번 추출</h3>
-      <div class="meta" style="margin:-6px 0 8px">토너별로 <b>위=운영툴 현재</b>, <b>아래=이번에 추출될 일정</b>을 같은 날짜 축에 그립니다. 운영툴에 무엇이 얼마나 들어 있었는지 그대로 보이므로, 무엇이 유지되고 무엇이 새로 붙는지 눈으로 확인할 수 있습니다.</div>
+      <h3 id="cmp_title">🔍 라이브 검증 — 기존 일정 vs 이번 추출</h3>
+      <div class="meta" id="cmp_desc" style="margin:-6px 0 8px"></div>
       <div class="cmplegend">
-        <span><i class="sw same"></i>그대로 (문제 없음)</span>
-        <span><i class="sw ok-new"></i>신규 추가 (정상)</span>
-        <span><i class="sw ok-changed"></i>미래 변경·삭제 (허용)</span>
-        <span><i class="sw violation-changed"></i>문제 — 도래분 변경·삭제·추가</span>
-        <span><i class="sw overlap"></i>시즌 겹침</span>
-        <span><i class="sw nowline"></i>오늘 / 도래 경계(+1일)</span>
+        <span><i class="sw same"></i><b>초록</b> 그대로 — 기존과 같음 (문제 없음)</span>
+        <span><i class="sw ok-new"></i><b>파랑</b> 신규 — 기존에 없던 것을 새로 추가 (정상)</span>
+        <span><i class="sw ok-changed"></i><b>노랑</b> 미래 변경·삭제 — 아직 안 보인 구간이라 허용</span>
+        <span><i class="sw violation-changed"></i><b>빨강</b> 문제 — 이미 도래한 것을 바꾸거나 지우거나 끼워넣음</span>
+        <span><i class="sw overlap"></i>빗금 — 기간 겹침</span>
+        <span><i class="sw nowline"></i>세로선 — 오늘 / 도래 경계(오늘+1일)</span>
       </div>
       <div id="cmp_body" style="overflow:auto;max-height:60vh;border:1px solid #e0e3e8;border-radius:8px;background:#fff"></div>
       <div class="meta" id="cmp_status" style="min-height:14px;margin-top:8px"></div>
@@ -2196,7 +2203,12 @@ function runLiveVerify(){
   box.innerHTML=html;
   return v;
 }
-document.getElementById("cl_check").addEventListener("click",runLiveVerify);
+// 🔍 라이브 검증 = 텍스트 결과 갱신 + 시각화 팝업 (토너 쪽과 동일)
+document.getElementById("cl_check").addEventListener("click",()=>{
+  state.liveBase=document.getElementById("cl_base").value; save();
+  runLiveVerify(); renderLiveDiff();
+  if(!cmpDlg.open) cmpDlg.showModal();
+});
 const linfoDlg=document.getElementById("linfoDlg");
 document.getElementById("cl_info").addEventListener("click",()=>{ document.getElementById("li_today").textContent=todayISO(); document.getElementById("li_arrived").textContent=addDays(todayISO(),1); if(!linfoDlg.open) linfoDlg.showModal(); });
 document.getElementById("li_close").addEventListener("click",()=>linfoDlg.close());
@@ -2501,22 +2513,77 @@ function buildTourneyDiff(liveRecords, genRecords, today){
   return {rows, from:minD, to:maxD, today, arrived, counts, violations};
 }
 const DIFF_LABEL={ same:"그대로", "ok-new":"신규 추가", "ok-changed":"미래 변경", "ok-removed":"미래 삭제",
-  "violation-changed":"도래 기간 변경", "violation-removed":"도래 삭제", "violation-added":"도래 날짜 추가" };
+  "violation-changed":"도래분 내용 변경", "violation-removed":"도래분 삭제·누락", "violation-added":"도래 날짜 추가",
+  "violation-moved":"도래분 인덱스 변경", "ok-outrange":"추출 범위 밖 (안 건드림)" };
+// 라이브 테이블 비교 — 토너와 같은 그림을 쓰되 단위가 「시즌」이 아니라 「행」이다.
+// 행 묶음 = 추출키(eventDefinitionKey). 같은 추출키의 행들이 한 레인에 늘어선다.
+// 라이브 테이블은 **행 단위 붙여넣기**라, 추출 범위 밖 과거 행은 건드리지 않으므로 문제가 아니다(ok-outrange).
+function buildLiveDiff(liveRows, genRows, today, from, to){
+  const arrived=addDays(today,1);
+  const L=liveRows||[], G=genRows||[];
+  const semOf=r=>r.startDate+"|"+(r.defKey||("~"+r.name));
+  const groupOf=r=>(r.defKey||("~"+(r.name||"이름없음")));
+  const inRange=r=>(!from||r.startDate>=from)&&(!to||r.startDate<=to);
+  const blank=v=>v===null||v===undefined||String(v).trim()==="";
+  const CMP=[["endDate","종료일"],["days","기간"],["evType","타입"],["name","설명"],
+             ["openCond","openCondition"],["condVal","conditionValue"],["expireCond","expireCondition"],["spare","spareTime"]];
+  const diffOf=(l,g)=>{ const out=[]; for(const [f,nm] of CMP){ if(blank(l[f])) continue;
+    if(String(l[f])!==String(g[f])) out.push(nm); } return out; };
+  const bucket=rows=>{ const m=new Map(); for(const r of rows){ const k=semOf(r); if(!m.has(k)) m.set(k,[]); m.get(k).push(r); } return m; };
+  const lB=bucket(L), gB=bucket(G);
+  const lByPk=new Map(L.map(r=>[r.pk,r])), gByPk=new Map(G.map(r=>[r.pk,r]));
+  const endOf=r=>r.endDate||addDays(r.startDate, Math.max(1, r.days||1));
+  let minD="", maxD="";
+  const track=d=>{ if(!d) return; if(!minD||d<minD) minD=d; if(d>maxD) maxD=d; };
+  const counts={same:0,"ok-new":0,"ok-changed":0,"ok-removed":0,"ok-outrange":0,
+    "violation-changed":0,"violation-removed":0,"violation-added":0,"violation-moved":0};
+  const rows=new Map();
+  const put=(r, lane, segStatus, note)=>{
+    const k=groupOf(r); if(!rows.has(k)) rows.set(k,{sk:k, desc:"", live:[], gen:[], inLive:false, inGen:false});
+    const row=rows.get(k); if(!row.desc && r.name) row.desc=r.name;
+    const s=r.startDate, e=endOf(r); track(s); track(e);
+    row[lane].push({s, e, status:segStatus, note});
+    if(counts[segStatus]!=null) counts[segStatus]++;
+    return row;
+  };
+  for(const [sem, ls] of lB){
+    const gs=gB.get(sem)||[];
+    ls.forEach((l,i)=>{
+      const g=gs[i]; let stt, note=l.pk;
+      if(!g) stt = l.startDate>arrived ? "ok-removed" : (inRange(l) ? "violation-removed" : "ok-outrange");
+      else if(g.pk!==l.pk) stt = l.startDate>arrived ? "ok-changed" : "violation-moved", note=`${l.pk} → ${g.pk}`;
+      else { const df=diffOf(l,g); stt = df.length ? (l.startDate>arrived?"ok-changed":"violation-changed") : "same";
+             if(df.length) note=`${l.pk} · ${df.join("·")}`; }
+      put(l,"live",stt,note).inLive=true;
+    });
+  }
+  for(const [sem, gs] of gB){
+    const ls=lB.get(sem)||[];
+    gs.forEach((g,i)=>{
+      const l=ls[i]; let stt, note=g.pk;
+      if(!l){ stt = g.startDate>arrived ? "ok-new" : "violation-added";
+        const taken=lByPk.get(g.pk);
+        if(taken && semOf(taken)!==sem && g.startDate<=arrived) note=`${g.pk} — 기존 「${taken.startDate} ${taken.name||""}」 자리를 덮어씀`; }
+      else if(g.pk!==l.pk) stt = g.startDate>arrived ? "ok-changed" : "violation-moved", note=`${l.pk} → ${g.pk}`;
+      else { const df=diffOf(l,g); stt = df.length ? (g.startDate>arrived?"ok-changed":"violation-changed") : "same";
+             if(df.length) note=`${g.pk} · ${df.join("·")}`; }
+      put(g,"gen",stt,note).inGen=true;
+    });
+  }
+  const list=[...rows.values()].sort((a,b)=>String(a.sk).localeCompare(String(b.sk)));
+  for(const r of list){ const by=(a,b)=>a.s<b.s?-1:(a.s>b.s?1:0); r.live.sort(by); r.gen.sort(by); }
+  const violations=counts["violation-changed"]+counts["violation-removed"]+counts["violation-added"]+counts["violation-moved"];
+  return {rows:list, from:minD, to:maxD, today, arrived, counts, violations};
+}
 const cmpDlg=document.getElementById("cmpDlg");
-function renderTourneyDiff(){
+// 두 검증(토너·라이브 테이블)이 같은 그림을 쓴다 — diff 모델만 다르고 그리는 방식은 동일.
+// d = {rows:[{sk,desc,live:[seg],gen:[seg],inLive,inGen}], from,to,today,arrived,counts,violations}
+function renderDiffGrid(d, opt){
   const box=document.getElementById("cmp_body"), st=document.getElementById("cmp_status");
-  const raw=(document.getElementById("tn_base").value||"").trim();
-  if(!raw){ box.innerHTML=`<div class="cmpempty">운영툴 현재 JSON 이 비어 있습니다. 위 칸에 붙여넣으면 기존 일정과 나란히 비교해 드립니다.</div>`; st.textContent=""; return; }
-  let live; try{ live=JSON.parse(raw); if(!Array.isArray(live)) throw new Error("배열이 아님"); }
-  catch(e){ box.innerHTML=`<div class="cmpempty">운영툴 JSON 파싱 실패: ${escapeHtml(e.message)}</div>`; st.textContent=""; return; }
-  let res; try{ res=buildTournamentJSON(readTourneyForm(), document.getElementById("tn_from").value||""); }
-  catch(e){ box.innerHTML=`<div class="cmpempty">추출 계산 실패: ${escapeHtml(e.message)}</div>`; st.textContent=""; return; }
-  const d=buildTourneyDiff(live, res.records, todayISO());
-  if(!d.rows.length){ box.innerHTML=`<div class="cmpempty">비교할 시즌이 없습니다.</div>`; st.textContent=""; return; }
+  const unit=(opt&&opt.unit)||"칸";
   const N=Math.round((parseD(d.to)-parseD(d.from))/86400000)+1;
   const dw=Math.max(2, Math.min(14, Math.floor(1160/Math.max(1,N))));
   const W=N*dw, off=x=>Math.round((parseD(x)-parseD(d.from))/86400000)*dw;
-  // 월 눈금
   let head="";
   for(let i=0;i<N;i++){ const dd=parseD(addDays(d.from,i));
     if(dd.getUTCDate()!==1 && i!==0) continue;
@@ -2525,9 +2592,9 @@ function renderTourneyDiff(){
   const todayOff=(d.today>=d.from&&d.today<=d.to)?off(d.today):null;
   const arrOff =(d.arrived>=d.from&&d.arrived<=d.to)?off(d.arrived):null;
   const seg=(x)=>{ const l=off(x.s), w=Math.max(3, off(x.e)-l);
-    const t=`${x.s} ~ ${x.e} · ${DIFF_LABEL[x.status]||x.status}${x.overlap?" · ⚠ 시즌 겹침":""}`;
+    const t=`${x.s} ~ ${x.e} · ${DIFF_LABEL[x.status]||x.status}${x.overlap?" · ⚠ 시즌 겹침":""}${x.note?" · "+x.note:""}`;
     return `<div class="cmpseg ${x.status}${x.overlap?" overlap":""}" style="left:${l}px;width:${w}px" title="${escapeHtml(t)}"></div>`; };
-  let h=`<div class="cmpgrid" style="--w:${W}px">`;
+  let h=`<div class="cmpgrid">`;
   h+=`<div class="cmprow head"><div class="cmplabel"></div><div class="cmptrack" style="width:${W}px">${head}`
     +(todayOff!=null?`<div class="cmpnow" style="left:${todayOff}px"><span>오늘</span></div>`:"")
     +(arrOff!=null?`<div class="cmparr" style="left:${arrOff}px"></div>`:"")+`</div></div>`;
@@ -2540,14 +2607,46 @@ function renderTourneyDiff(){
       +(arrOff!=null?`<div class="cmparr" style="left:${arrOff}px"></div>`:"")
       +`</div></div>`;
   }
-  h+=`</div>`;
-  box.innerHTML=h;
+  box.innerHTML=h+`</div>`;
   const c=d.counts;
   st.innerHTML=(d.violations
       ? `<b style="color:#c0392b">❌ 문제 ${d.violations}곳</b> — 빨간 칸을 확인하세요.`
-      : `<b style="color:#137a51">✅ 문제 없음</b> — 도래한 시즌(${d.arrived} 까지 시작)이 모두 그대로입니다.`)
-    + ` · 그대로 ${c.same}칸 · 신규 ${c["ok-new"]}칸 · 미래 변경 ${c["ok-changed"]+c["ok-removed"]}칸`
+      : `<b style="color:#137a51">✅ 문제 없음</b> — 도래분(${d.arrived} 까지 시작)이 모두 그대로입니다.`)
+    + ` · 그대로 ${c.same}${unit} · 신규 ${c["ok-new"]}${unit} · 미래 변경 ${c["ok-changed"]+c["ok-removed"]}${unit}`
     + ` · 기간 ${d.from} ~ ${d.to}`;
+}
+function cmpFail(msg){ document.getElementById("cmp_body").innerHTML=`<div class="cmpempty">${escapeHtml(msg)}</div>`;
+  document.getElementById("cmp_status").textContent=""; }
+function setCmpTitle(kind){
+  document.getElementById("cmp_title").textContent = kind==="live"
+    ? "🔍 라이브 검증 — 시트 현재 행 vs 이번 추출" : "🔍 라이브 검증 — 기존 일정 vs 이번 추출";
+  document.getElementById("cmp_desc").innerHTML = kind==="live"
+    ? '<b>이벤트(추출키)별</b>로 <b>위=시트 현재 행</b>, <b>아래=이번에 추출될 행</b>을 같은 날짜 축에 그립니다. 칸에 커서를 올리면 <code>EventSchedule_그룹_인덱스</code> 키까지 보입니다.'
+    : '토너별로 <b>위=운영툴 현재</b>, <b>아래=이번에 추출될 일정</b>을 같은 날짜 축에 그립니다. 운영툴에 무엇이 얼마나 들어 있었는지 그대로 보이므로, 무엇이 유지되고 무엇이 새로 붙는지 눈으로 확인할 수 있습니다.';
+}
+function renderTourneyDiff(){
+  setCmpTitle("tourney");
+  const raw=(document.getElementById("tn_base").value||"").trim();
+  if(!raw) return cmpFail("운영툴 현재 JSON 이 비어 있습니다. 위 칸에 붙여넣으면 기존 일정과 나란히 비교해 드립니다.");
+  let live; try{ live=JSON.parse(raw); if(!Array.isArray(live)) throw new Error("배열이 아님"); }
+  catch(e){ return cmpFail("운영툴 JSON 파싱 실패: "+e.message); }
+  let res; try{ res=buildTournamentJSON(readTourneyForm(), document.getElementById("tn_from").value||""); }
+  catch(e){ return cmpFail("추출 계산 실패: "+e.message); }
+  const d=buildTourneyDiff(live, res.records, todayISO());
+  if(!d.rows.length) return cmpFail("비교할 시즌이 없습니다.");
+  renderDiffGrid(d, {unit:"칸"});
+}
+function renderLiveDiff(){
+  setCmpTitle("live");
+  const raw=(document.getElementById("cl_base").value||"").trim();
+  if(!raw) return cmpFail("운영툴 현재 데이터가 비어 있습니다. 시트의 EventSchedule 행을 붙여넣으면 나란히 비교해 드립니다.");
+  const p=parseLiveTSV(raw);
+  if(!p.rows.length) return cmpFail("붙여넣은 데이터에서 EventSchedule 행을 찾지 못했습니다.");
+  const f=readLiveForm();
+  const gen=liveTableData(f.gs, f.from, f.iStart, f.to).rows;
+  const d=buildLiveDiff(p.rows, gen, todayISO(), f.from, f.to);
+  if(!d.rows.length) return cmpFail("비교할 행이 없습니다.");
+  renderDiffGrid(d, {unit:"행"});
 }
 function runTourneyVerify(){
   const box=document.getElementById("tn_verify"); if(!box) return null;
