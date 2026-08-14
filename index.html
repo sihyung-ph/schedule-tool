@@ -169,6 +169,7 @@
   .cmpseg.ok-changed, .cmpseg.ok-removed { background:#f5d79e; }
   .cmpseg.ok-outrange { background:#e6e9ed; }
   .cmpseg.violation-moved { background:#ef8a80; border-color:#b23b30; }
+  .cmpseg.violation-unknown { background:#d16bd1; border-color:#7d2a7d; }
   .cmpseg.violation-changed, .cmpseg.violation-removed, .cmpseg.violation-added { background:#ef8a80; border-color:#b23b30; }
   .cmpseg.overlap { background-image:repeating-linear-gradient(45deg, rgba(178,59,48,.9) 0 5px, rgba(178,59,48,.5) 5px 10px); border-color:#b23b30; }
   .cmpnone { position:absolute; left:52px; top:3px; font-size:10px; color:#b9bfc7; font-style:italic; }
@@ -182,6 +183,7 @@
   .cmplegend .sw.ok-new { background:#9ec5f5; }
   .cmplegend .sw.ok-changed { background:#f5d79e; }
   .cmplegend .sw.violation-changed { background:#ef8a80; border-color:#b23b30; }
+  .cmplegend .sw.violation-unknown { background:#d16bd1; border-color:#7d2a7d; }
   .cmplegend .sw.nowline { background:linear-gradient(90deg,#f5a623 0 50%,#d6313b 50% 100%); }
   .cmplegend .sw.overlap { background-image:repeating-linear-gradient(45deg, rgba(178,59,48,.9) 0 4px, rgba(178,59,48,.5) 4px 8px); border-color:#b23b30; }
   .cmpempty { padding:20px; color:#9aa0a8; font-size:13px; }
@@ -396,6 +398,7 @@
           <tr><td><b>도래 시즌 기간 변경</b></td><td>시작일은 같은데 종료일이 다름 → 진행 중인 시즌의 기간이 바뀜</td></tr>
           <tr><td><b>과거 시즌 추가</b></td><td>이미 지난 날짜로 시즌을 새로 만듦 (운영툴엔 없던 것) → “뒤에만 추가” 규칙 위반</td></tr>
           <tr><td><b>컨텐츠 누락</b></td><td>도래한 시즌을 가진 ContentId 가 이번 추출에 아예 없음 → 그 토너의 라이브 기록 소실</td></tr>
+          <tr><td><b>편집기에 없는 토너</b></td><td>붙여넣은 운영툴 데이터에 <b>편집기가 모르는 스케쥴 토너</b>가 있음 = 누군가 운영툴에서 직접 추가한 것. 추출은 그대로 통과시키지만 앞으로 편집기가 관리하지 못하고, 같은 날짜에 다른 토너를 깔면 조용히 충돌합니다 → 📤 추출 설정에 그 DefKey 를 등록하고 타임라인에 배치하세요. (클랜 고정 베이스처럼 <code>CustomSeasonDatas</code> 가 없는 레코드는 원래 운영툴 관리라 제외)</td></tr>
           <tr><td><b>시즌 기간 겹침</b></td><td>같은 토너의 시즌 두 개가 기간이 겹침 → 시즌이 동시에 진행되어 시즌ID·랭킹이 깨짐. 「이 날짜부터」 경계에 걸친 기존 시즌과 새 스케쥴이 부딪힐 때 주로 발생 → 새 스케쥴을 앞 시즌 종료일 이후로 옮기세요</td></tr>
         </table></div>
 
@@ -629,6 +632,7 @@
         <span><i class="sw ok-new"></i><b>파랑</b> 신규 — 기존에 없던 것을 새로 추가 (정상)</span>
         <span><i class="sw ok-changed"></i><b>노랑</b> 미래 변경·삭제 — 아직 안 보인 구간이라 허용</span>
         <span><i class="sw violation-changed"></i><b>빨강</b> 문제 — 이미 도래한 것을 바꾸거나 지우거나 끼워넣음</span>
+        <span><i class="sw violation-unknown"></i><b>보라</b> 편집기에 없는 토너 — 운영툴에서 직접 추가됨 (토너 검증만)</span>
         <span><i class="sw overlap"></i>빗금 — 기간 겹침</span>
         <span><i class="sw nowline"></i>세로선 — 오늘 / 도래 경계(오늘+1일)</span>
       </div>
@@ -2203,6 +2207,34 @@ function runLiveVerify(){
   box.innerHTML=html;
   return v;
 }
+// 고정 베이스가 저장해 둔 기준과 달라졌으면 알리고, 「기본으로 저장」 버튼을 붙인다.
+function baseChangeHTML(liveRecords){
+  const saved=state.tourneyBaseSaved;
+  const d=diffBaseRecords(saved||[], liveRecords);
+  if(!saved){
+    if(!d.current) return "";
+    return `<div class="vbox warn" style="margin-top:6px"><div class="vhead">📌 고정 베이스 기준이 아직 없습니다 (${d.current}종)</div>
+      클랜 컨텐츠처럼 <b>시즌이 없는 레코드</b>는 편집기 밖에서 관리돼 그대로 통과합니다. 지금 값을 기준으로 저장해 두면 <b>다음부터 바뀌었을 때 알려드립니다.</b>
+      <div style="margin-top:6px"><button type="button" id="tn_basesave" class="primary">이 값을 기본으로 저장</button></div></div>`;
+  }
+  if(!d.differs) return `<div class="vbox ok" style="margin-top:6px"><div class="vhead">📌 고정 베이스 그대로 (${d.same.length}종)</div>저장해 둔 기준과 같습니다.</div>`;
+  const li2=(t,a)=>a.length?`<li><b>${t}</b>: ${a.map(x=>`<code>${escapeHtml(x)}</code>`).join(", ")}</li>`:"";
+  return `<div class="vbox warn" style="margin-top:6px"><div class="vhead">📌 고정 베이스가 바뀌었습니다 — 저장해 둔 기준과 다름</div>
+    <ul>${li2("추가됨",d.added)}${li2("사라짐",d.removed)}${li2("내용 바뀜",d.changed)}</ul>
+    운영툴에서 누가 바꿨다는 뜻입니다. 의도한 변경이면 <b>새 값을 기준으로 저장</b>하세요. 아니면 운영툴 쪽을 확인해야 합니다.
+    <div style="margin-top:6px"><button type="button" id="tn_basesave" class="primary">바뀐 값을 앞으로 기본으로 저장</button></div></div>`;
+}
+// 버튼은 innerHTML 로 매번 새로 그려지므로 위임으로 받는다
+document.addEventListener("click", e=>{
+  if(!e.target.closest || !e.target.closest("#tn_basesave")) return;
+  e.preventDefault();
+  let live; try{ live=JSON.parse((document.getElementById("tn_base").value||"").trim()); }catch(_){ return; }
+  if(!Array.isArray(live)) return;
+  pushHistory();
+  state.tourneyBaseSaved=[...baseRecordsOf(live).values()];
+  save(); runTourneyVerify();
+  alert(`고정 베이스 ${state.tourneyBaseSaved.length}종을 기준으로 저장했습니다.\n다음부터 이 값과 달라지면 알려드립니다.`);
+});
 // 🔍 라이브 검증 = 텍스트 결과 갱신 + 시각화 팝업 (토너 쪽과 동일)
 document.getElementById("cl_check").addEventListener("click",()=>{
   state.liveBase=document.getElementById("cl_base").value; save();
@@ -2307,7 +2339,11 @@ function buildTournamentJSON(def, fromDate){
   const map=new Map();
   for(const r of base){ const k=(r&&r.SK)||(r&&r.SKObj&&r.SKObj.ContentId); if(k) map.set(k,r); else map.set("__"+map.size, r); }
   for(const r of sched) map.set(r.SK, r);
-  return { records:[...map.values()], baseCount:base.length, typeCount:sched.length, seasonTotal, keptTotal, noKey, durWarn, inherited, inherit };
+  // 편집기가 아는 토너 = 추출설정에서 토너먼트로 지정된 프리셋의 DefKey 전부.
+  // (이번 날짜 범위에 막대가 없어도 «아는» 토너다 — 안 그러면 정상 상황을 모르는 토너로 오인한다)
+  const knownKeys=[...new Set(state.definitions.filter(d=>(d.exportTargets||[]).includes("tournament"))
+    .map(d=>String(d.tourneyDefKey||"").trim()).filter(Boolean))];
+  return { records:[...map.values()], baseCount:base.length, typeCount:sched.length, seasonTotal, keptTotal, noKey, durWarn, inherited, inherit, knownKeys };
 }
 // 오프라인 테스트용 슬림 추출 (생성 스케쥴 토너만, 5필드)
 function buildOfflineTournamentJSON(def, fromDate){
@@ -2328,7 +2364,39 @@ function buildOfflineTournamentJSON(def, fromDate){
 }
 // ===== 라이브 훼손 검증 — 도래한 시즌(시작일 ≤ 오늘+1일, UpComing 포함)은 불변, 그 이후는 변경 자유 =====
 // liveRecords = 운영툴 현재 JSON 배열, genRecords = 이번에 추출될 레코드 배열, today = "YYYY-MM-DD"
-function verifyTourneyAgainstLive(liveRecords, genRecords, today){
+// ===== 고정 베이스 변경 감지 =====
+// 고정 베이스 = CustomSeasonDatas 가 없는 레코드(클랜 컨텐츠 등) — 편집기 밖에서 관리되고 추출 때 그대로 통과한다.
+// 그래서 운영툴에서 바뀌어도 조용히 지나간다. 마지막으로 «기본으로 저장» 한 값과 비교해 달라지면 알린다.
+function canonJSON(v){
+  if(Array.isArray(v)) return "["+v.map(canonJSON).join(",")+"]";
+  if(v && typeof v==="object") return "{"+Object.keys(v).sort().map(k=>JSON.stringify(k)+":"+canonJSON(v[k])).join(",")+"}";
+  return JSON.stringify(v===undefined?null:v);
+}
+function baseRecordsOf(records){
+  const m=new Map();
+  for(const r of (records||[])){
+    const sk=(r&&(r.SK||(r&&r.SKObj&&r.SKObj.ContentId)))||""; if(!sk) continue;
+    const cs=r&&r.SeasonSetting&&r.SeasonSetting.CustomSeasonDatas;
+    if(Array.isArray(cs)) continue;                 // 시즌이 있으면 스케쥴 토너 — 베이스가 아니다
+    m.set(sk,r);
+  }
+  return m;
+}
+function diffBaseRecords(savedRecords, currentRecords){
+  const A=baseRecordsOf(savedRecords), B=baseRecordsOf(currentRecords);
+  const added=[], removed=[], changed=[], same=[];
+  for(const [sk,r] of B){
+    if(!A.has(sk)) added.push(sk);
+    else if(canonJSON(A.get(sk))!==canonJSON(r)) changed.push(sk);
+    else same.push(sk);
+  }
+  for(const sk of A.keys()) if(!B.has(sk)) removed.push(sk);
+  const s=x=>x.sort();
+  return {added:s(added), removed:s(removed), changed:s(changed), same:s(same),
+    differs:(added.length+removed.length+changed.length)>0, current:B.size, saved:A.size};
+}
+// knownKeys = 편집기가 아는 토너 ContentId 목록. 넘기면 «편집기 밖에서 추가된 스케쥴 토너» 를 잡는다.
+function verifyTourneyAgainstLive(liveRecords, genRecords, today, knownKeys){
   // ⚠️ 라이브 테이블과 동일 — 「도래」 기준은 오늘이 아니라 **오늘+1일**.
   // 게임이 하루 뒤 일정까지 UpComing 으로 미리 노출하므로 내일 시작 시즌은 이미 플레이어에게 보였다.
   const arrived=addDays(today,1);
@@ -2366,6 +2434,17 @@ function verifyTourneyAgainstLive(liveRecords, genRecords, today){
     const srt=gs.slice().sort((a,b)=> a.s<b.s?-1:(a.s>b.s?1:0));
     for(let i=1;i<srt.length;i++) if(srt[i].s < srt[i-1].e)
       violations.push({sk, type:"시즌 기간 겹침", detail:`${srt[i-1].s}~${srt[i-1].e} 와 ${srt[i].s}~${srt[i].e} 가 겹침 — 같은 토너의 시즌이 동시에 진행됨 (스케쥴을 앞 시즌 종료일 이후로 옮기세요)`});
+  }
+  // 모르는 토너 — 붙여넣은 운영툴 데이터에 **편집기에 없는 스케쥴 토너**가 있는 경우.
+  // 누군가 운영툴에서 직접 추가했다는 뜻이다. 추출은 그대로 통과시키지만 앞으로 편집기가 관리하지 못하고,
+  // 편집기에서 같은 날짜에 다른 토너를 깔면 조용히 충돌한다 → 강한 경고(위반)로 올린다.
+  // 클랜 고정 베이스(CustomSeasonDatas:null)는 원래 운영툴 관리라 애초에 live 맵에 없다(제외됨).
+  if(Array.isArray(knownKeys) && knownKeys.length!==undefined){
+    const known=new Set(knownKeys);
+    for(const [sk, ls] of live){
+      if(known.has(sk)) continue;
+      violations.push({sk, type:"편집기에 없는 토너", detail:`운영툴에 시즌 ${ls.length}개(${ls.map(x=>x.s).join(", ")})가 있는데 편집기에는 이 토너가 없습니다 — 편집기 밖에서 추가된 것입니다. 추출은 이 레코드를 그대로 통과시키지만, 앞으로 편집기가 관리하지 못하고 같은 날짜에 다른 토너를 깔면 충돌합니다. 📤 추출 설정에 토너 DefKey «${sk}» 를 등록하고 타임라인에 막대를 배치하세요`});
+    }
   }
   // (a) 설정값 차이 검증 — 기존 컨텐츠의 설정이 운영툴과 달라지는지 (시즌 날짜 외)
   const SETTING_KEYS=["MaxEntryGroupSize","RewardClaimableSeasonCount","RewardDurationMin","SeparateByUserTags","NoWindow","IsRelationShipContent","ActiveRankBoardRegister","SetScoreType","FreezeProfileCache","RegisterBlockedMin","FillInLastGroupAfterRegisterBlockedMin","CategoryIds","Description"];
@@ -2478,7 +2557,7 @@ tourneyDlg.addEventListener("change", persistTourneyForm);
 // 두 줄을 같은 날짜 축에 겹쳐 놓으면 «그대로인 것 / 새로 붙는 것 / 문제인 것» 이 한눈에 보인다.
 // status: same(일치) · ok-new(신규, 정상) · ok-changed(미래 변경, 허용) · ok-removed(미래 삭제, 허용)
 //         violation-changed(도래 기간 변경) · violation-removed(도래 삭제) · violation-added(도래 날짜 추가)
-function buildTourneyDiff(liveRecords, genRecords, today){
+function buildTourneyDiff(liveRecords, genRecords, today, knownKeys){
   const arrived=addDays(today,1);                       // 도래 기준 = 오늘+1일 (UpComing)
   const dOf=s=>String(s||"").slice(0,10);
   const seasonsOf=r=>{ const cs=r&&r.SeasonSetting&&r.SeasonSetting.CustomSeasonDatas;
@@ -2496,8 +2575,9 @@ function buildTourneyDiff(liveRecords, genRecords, today){
     if(other.e!==mine.e) return mine.s<=arrived ? "violation-changed" : "ok-changed";
     return "same";
   };
+  const known=Array.isArray(knownKeys)?new Set(knownKeys):null;
   const rows=[]; const counts={same:0,"ok-new":0,"ok-changed":0,"ok-removed":0,
-    "violation-changed":0,"violation-removed":0,"violation-added":0,overlap:0};
+    "violation-changed":0,"violation-removed":0,"violation-added":0,"violation-unknown":0,overlap:0};
   for(const sk of [...new Set([...live.keys(), ...gen.keys()])].sort()){
     const ls=(live.get(sk)||[]).slice().sort((a,b)=>a.s<b.s?-1:(a.s>b.s?1:0));
     const gs=(gen.get(sk)||[]).slice().sort((a,b)=>a.s<b.s?-1:(a.s>b.s?1:0));
@@ -2506,15 +2586,20 @@ function buildTourneyDiff(liveRecords, genRecords, today){
     const genSegs =gs.map(x=>{ track(x.s); track(x.e); return {s:x.s,e:x.e,status:cls(x,lBy.get(x.s),false)}; });
     for(let i=1;i<genSegs.length;i++) if(genSegs[i].s<genSegs[i-1].e){ genSegs[i].overlap=true; genSegs[i-1].overlap=true; }
     for(const g of genSegs) if(g.overlap) counts.overlap++;
+    // 편집기가 모르는 토너 = 운영툴에서 직접 추가된 것. 두 줄 모두 빨갛게 칠해 눈에 띄게 한다.
+    const unknown = !!(known && live.has(sk) && !known.has(sk));
+    if(unknown) for(const s of liveSegs.concat(genSegs)){ s.status="violation-unknown"; s.note="편집기에 없는 토너"; }
     for(const seg of liveSegs.concat(genSegs)) if(counts[seg.status]!=null) counts[seg.status]++;
-    rows.push({sk, desc:desc.get(sk)||"", live:liveSegs, gen:genSegs, inLive:live.has(sk), inGen:gen.has(sk)});
+    rows.push({sk, desc:(desc.get(sk)||"")+(unknown?" ⚠ 편집기에 없음":""), live:liveSegs, gen:genSegs,
+      inLive:live.has(sk), inGen:gen.has(sk), unknown});
   }
-  const violations=counts["violation-changed"]+counts["violation-removed"]+counts["violation-added"]+counts.overlap;
+  const violations=counts["violation-changed"]+counts["violation-removed"]+counts["violation-added"]+counts["violation-unknown"]+counts.overlap;
   return {rows, from:minD, to:maxD, today, arrived, counts, violations};
 }
 const DIFF_LABEL={ same:"그대로", "ok-new":"신규 추가", "ok-changed":"미래 변경", "ok-removed":"미래 삭제",
   "violation-changed":"도래분 내용 변경", "violation-removed":"도래분 삭제·누락", "violation-added":"도래 날짜 추가",
-  "violation-moved":"도래분 인덱스 변경", "ok-outrange":"추출 범위 밖 (안 건드림)" };
+  "violation-moved":"도래분 인덱스 변경", "ok-outrange":"추출 범위 밖 (안 건드림)",
+  "violation-unknown":"편집기에 없는 토너 (툴 밖에서 추가됨)" };
 // 라이브 테이블 비교 — 토너와 같은 그림을 쓰되 단위가 「시즌」이 아니라 「행」이다.
 // 행 묶음 = 추출키(eventDefinitionKey). 같은 추출키의 행들이 한 레인에 늘어선다.
 // 라이브 테이블은 **행 단위 붙여넣기**라, 추출 범위 밖 과거 행은 건드리지 않으므로 문제가 아니다(ok-outrange).
@@ -2632,7 +2717,7 @@ function renderTourneyDiff(){
   catch(e){ return cmpFail("운영툴 JSON 파싱 실패: "+e.message); }
   let res; try{ res=buildTournamentJSON(readTourneyForm(), document.getElementById("tn_from").value||""); }
   catch(e){ return cmpFail("추출 계산 실패: "+e.message); }
-  const d=buildTourneyDiff(live, res.records, todayISO());
+  const d=buildTourneyDiff(live, res.records, todayISO(), res.knownKeys);
   if(!d.rows.length) return cmpFail("비교할 시즌이 없습니다.");
   renderDiffGrid(d, {unit:"칸"});
 }
@@ -2656,12 +2741,13 @@ function runTourneyVerify(){
   catch(e){ box.innerHTML=`<div class="vbox bad"><div class="vhead">❌ 운영툴 JSON 파싱 실패</div>${escapeHtml(e.message)}</div>`; return null; }
   let res; try{ res=buildTournamentJSON(readTourneyForm(), document.getElementById("tn_from").value||""); }
   catch(e){ box.innerHTML=`<div class="vbox bad"><div class="vhead">❌ 추출 계산 실패</div>${escapeHtml(e.message)}</div>`; return null; }
-  const v=verifyTourneyAgainstLive(live, res.records, todayISO());
+  const v=verifyTourneyAgainstLive(live, res.records, todayISO(), res.knownKeys);
   const li=a=>a.map(x=>`<li><code>${escapeHtml(x.sk)}</code> · <b>${escapeHtml(x.type)}</b> — ${escapeHtml(x.detail)}</li>`).join("");
   let html="";
   if(v.violations.length) html+=`<div class="vbox bad"><div class="vhead">❌ 라이브 훼손 위반 ${v.violations.length}건 — 이대로 임포트하면 서비스 데이터가 깨집니다</div><ul>${li(v.violations)}</ul></div>`;
   else html+=`<div class="vbox ok"><div class="vhead">✅ 위반 없음 — 도래한 시즌(${addDays(todayISO(),1)} 까지 시작 = 오늘+1일, UpComing 포함) 모두 그대로 유지됨</div>운영툴 토너 ${v.liveCount}종 · 추출 ${v.genCount}종 비교.</div>`;
   if(v.notes.length) html+=`<div class="vbox warn" style="margin-top:6px"><div class="vhead">ℹ 참고 ${v.notes.length}건 (허용되는 변경)</div><ul>${li(v.notes)}</ul></div>`;
+  html+=baseChangeHTML(live);   // 고정 베이스가 저장해 둔 기준과 달라졌는지
   box.innerHTML=html;
   return v;
 }
