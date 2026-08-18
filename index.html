@@ -638,7 +638,7 @@
     <form method="dialog" class="dlg" style="width:min(94vw,460px)">
       <h3>🔄 대치 — 다른 스케쥴로 바꾸기</h3>
       <div class="meta" style="margin:-6px 0 8px">지금 막대: <span id="sw_cur"></span></div>
-      <div class="meta" style="margin-bottom:8px"><b>시작일은 그대로</b> 두고 스케쥴만 바꿉니다. 기간은 고른 프리셋을 따르므로 <b>종료일은 달라질 수 있습니다.</b> 타입이 다르면 그 트랙으로 옮겨갑니다.</div>
+      <div class="meta" style="margin-bottom:8px"><b>선택한 막대만</b> 바뀝니다. <b>각자의 시작일은 그대로</b> 두고 스케쥴만 바꿉니다. 기간은 고른 프리셋을 따르므로 <b>종료일은 달라질 수 있습니다.</b> 타입이 다르면 그 트랙으로 옮겨갑니다.</div>
       <div id="sw_list" style="max-height:52vh;overflow:auto;border:1px solid #e0e3e8;border-radius:8px;background:#fff"></div>
       <div class="actions"><div></div><div class="right"><button type="button" id="sw_cancel">취소</button></div></div>
     </form>
@@ -1164,7 +1164,10 @@ window.addEventListener("blur", hideBarTip);
 function attachHandlers(){
   grid.querySelectorAll(".bar").forEach(el=>{ el.addEventListener("pointerdown", onBarDown);
     el.addEventListener("dblclick", ()=>{ const b=state.bars.find(x=>x.id===el.dataset.bar); if(b && b.defKey && defOf(b)) openDef(b.defKey); else openEdit(el.dataset.bar); }); // 더블클릭=프리셋 수정 (무링크는 인스턴스 편집)
-    el.addEventListener("contextmenu", e=>{ e.preventDefault(); const id=el.dataset.bar; selectedSet=new Set([id]); selectedId=id; render(); showCtx(e.clientX, e.clientY, id); }); });
+    el.addEventListener("contextmenu", e=>{ e.preventDefault(); const id=el.dataset.bar;
+      // 이미 선택된 막대를 우클릭하면 **선택을 유지**한다 (다중 대치·삭제를 위해). 아니면 그 막대만 선택.
+      if(!selectedSet.has(id)){ selectedSet=new Set([id]); selectedId=id; render(); }
+      showCtx(e.clientX, e.clientY, id); }); });
   grid.querySelectorAll(".warn-cell.bad").forEach(c=>c.addEventListener("click", e=>{ e.stopPropagation(); showWarnPopup(e.clientX, e.clientY, +c.dataset.day); }));
   grid.querySelectorAll(".day-cell").forEach(c=>c.addEventListener("dblclick", e=>{ e.stopPropagation(); openNote(c.dataset.date); }));
   grid.querySelectorAll(".note-bubble").forEach(nb=>nb.addEventListener("click", e=>{ e.stopPropagation(); openNote(nb.dataset.date); }));
@@ -1205,6 +1208,13 @@ function hideCtx(){ ctxmenu.classList.remove("show"); ctxBarId=null; }
 // ---------- 대치 (다른 프리셋으로 갈아끼우기) ----------
 // **시작일만 유지**한다. 기간은 새 프리셋 값을 따르므로 종료일은 달라질 수 있다(사용자 지정 규칙).
 // 트랙(eventType)도 새 프리셋을 따라가므로 막대가 다른 트랙으로 옮겨갈 수 있다.
+// 대치 대상 = 우클릭한 막대가 선택에 들어 있으면 **선택 전체**, 아니면 그 막대 하나.
+// 선택하지 않은 막대는 절대 바뀌지 않는다.
+function swapTargetIds(ctxId, selectedIds){
+  if(!ctxId) return [];
+  const sel=[...(selectedIds||[])];
+  return sel.includes(ctxId) ? sel : [ctxId];
+}
 function swappedBar(bar, def){
   if(!bar || !def) return null;
   return Object.assign({}, bar, {
@@ -1216,13 +1226,15 @@ function swappedBar(bar, def){
   });
 }
 const swapDlg=document.getElementById("swapDlg");
-let swapBarId=null;
+let swapIds=[];
 function openSwap(id){
   const b=state.bars.find(z=>z.id===id); if(!b) return;
-  swapBarId=id;
+  swapIds=swapTargetIds(id, selectedSet).filter(x=>state.bars.some(z=>z.id===x));
+  const bars=swapIds.map(x=>state.bars.find(z=>z.id===x));
   const cur=defOf(b);
-  document.getElementById("sw_cur").innerHTML=`<span class="dot" style="background:${barColor(b)}"></span>`
-    +`<b>${escapeHtml(barName(b))}</b> · ${escapeHtml(barType(b))} · ${b.days}일 · <b>${b.startDate}</b> 시작`;
+  document.getElementById("sw_cur").innerHTML = bars.length>1
+    ? `<b>${bars.length}개 막대</b> — ${bars.map(x=>`${escapeHtml(barName(x))} <span style="color:#8a92a0">${x.startDate}</span>`).slice(0,6).join(", ")}${bars.length>6?` 외 ${bars.length-6}개`:""}`
+    : `<span class="dot" style="background:${barColor(b)}"></span><b>${escapeHtml(barName(b))}</b> · ${escapeHtml(barType(b))} · ${b.days}일 · <b>${b.startDate}</b> 시작`;
   const byType={};
   for(const d of state.definitions){ (byType[d.eventType||"미분류"]||(byType[d.eventType||"미분류"]=[])).push(d); }
   let h="";
@@ -1240,10 +1252,10 @@ function openSwap(id){
 }
 document.getElementById("sw_list").addEventListener("click", e=>{
   const row=e.target.closest(".swrow"); if(!row) return;
-  const b=state.bars.find(z=>z.id===swapBarId), d=state.definitions.find(x=>x.key===row.dataset.key);
-  if(!b||!d) return;
+  const d=state.definitions.find(x=>x.key===row.dataset.key); if(!d || !swapIds.length) return;
   pushHistory();
-  Object.assign(b, swappedBar(b,d));
+  const ids=new Set(swapIds);                       // 선택된 것만 — 그 외는 절대 건드리지 않는다
+  for(const b of state.bars) if(ids.has(b.id)) Object.assign(b, swappedBar(b,d));
   pruneInstances(); save(); renderPalette(); render();
   swapDlg.close();
 });
