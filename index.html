@@ -73,6 +73,9 @@
   .day-cell.today { background: #ffe08a; box-shadow: inset 0 0 0 2px #f5a623; }
   .day-cell.today .dnum { color:#b8740a; }
   .today-stripe { position:absolute; top:0; bottom:0; width:2px; background:#f5a623; z-index:3; pointer-events:none; }
+  /* 프리셋별 시작·끝 강조선 — 오늘 선과 같은 방식(트랙마다 그려 밴드를 관통) */
+  .edge-mark { position:absolute; top:0; bottom:0; width:2px; z-index:2; pointer-events:none; opacity:.85; }
+  .edge-mark.end { width:0; border-left:2px dashed currentColor; }
 
   .track-row { display: flex; border-bottom: 1px solid #e2e4e8; position: relative; }
   .track-label { flex: 0 0 var(--label-w); width: var(--label-w); background: #f7f8fa; border-right: 1px solid #c4c8cd; display: flex; align-items: center; gap: 6px; padding: 6px 8px; position: sticky; left:0; z-index:4; font-weight:600; }
@@ -615,6 +618,11 @@
       <div class="row" style="align-items:flex-start"><label>겹침 금지</label><div id="d_excl" class="excl-list"></div></div>
       <div class="meta">체크한 스케쥴과 날짜가 겹치면 경고 (여러 개 가능)</div>
       <div class="row"><label>색상</label><div class="swatches" id="d_sw"></div></div>
+      <div class="row"><label>시작·끝 강조</label><div style="flex:1">
+        <label style="display:flex;align-items:center;gap:6px;font-weight:600"><input id="d_mark" type="checkbox"> 시작일·종료일에 세로선 긋기</label>
+        <div id="d_mkbox" style="display:none;margin-top:6px"><div class="swatches" id="d_mksw"></div></div>
+      </div></div>
+      <div class="meta">오늘 선처럼 타임라인을 세로로 관통합니다. 시작일은 <b>실선</b>, 종료일은 <b>점선</b>. 이미지 내보내기에도 함께 나갑니다.</div>
       <div class="row" style="align-items:flex-start"><label>메모</label><textarea id="d_memo" rows="3" placeholder="이 스케쥴 관련 메모 (운영 참고용)" style="flex:1;padding:5px 7px;border:1px solid #c4c8cd;border-radius:5px;font-size:13px;resize:vertical;font-family:inherit"></textarea></div>
       <div class="actions">
         <button type="button" class="danger" id="d_del">삭제</button>
@@ -911,11 +919,13 @@ function renderInner(){
       if(!clipL) html += `<span class="plan-tag" style="background:${pi.color}">${escapeHtml(pi.name)}</span>`;
       html += `</div>`;
     }
+    const bandEdgeHTML=edgeMarksHTML(startDay,endDay);
     for (const type of types){
       html += `<div class="track-row${isDimmed(type)?" dimmed":""}" data-track="${escapeHtml(type)}" style="height:${trackHeight(type)}px">`;
       html += `<div class="track-label"><label class="track-vis" title="이 트랙 흐리게/선명 토글"><input type="checkbox" class="trackvis" data-type="${escapeHtml(type)}"${isDimmed(type)?"":" checked"}></label><span class="tdot" style="background:${typeColor(type)}"></span>${escapeHtml(type)}</div>`;
       html += `<div class="track-canvas" data-type="${escapeHtml(type)}" data-band="${band}" style="width:${bandW}px;background-image:linear-gradient(to right,#d3d7de 1px,transparent 1px);background-size:${state.dayWidth}px 100%">`;
       const ti=dayIndex(today); if(ti>=startDay && ti<=endDay) html += `<div class="today-stripe" style="left:${(ti-startDay)*state.dayWidth}px"></div>`;
+      html += bandEdgeHTML;
       for (const b of state.bars){ if(barType(b)!==type) continue; const seg=barSeg(b,startDay,endDay); if(seg) html+=seg; }
       html += `</div></div>`;
     }
@@ -1052,6 +1062,24 @@ document.getElementById("n_del").addEventListener("click",()=>saveNote("",""));
 document.getElementById("n_cancel").addEventListener("click",()=>noteDlg.close());
 document.getElementById("n_text").addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); saveNote(...readNoteForm()); } });
 
+// 시작·끝 강조선 — 「시작·끝 강조」를 켠 프리셋의 막대마다 시작일 왼쪽 / 종료일 오른쪽에 세로선.
+// 트랙과 무관하게 밴드 전체를 관통해야 하므로, 밴드 단위로 한 번 계산해 모든 track-canvas 에 같이 그린다.
+function edgeMarks(startDay, endDay){
+  const out=[];
+  for(const b of state.bars){
+    const d=defOf(b); if(!d || !d.markEdges) continue;
+    const color=d.markColor||"#d6313b", nm=barName(b);
+    const s=dayIndex(b.startDate), e=s+(b.days||1);          // e = 마지막 날 다음날(배타)
+    if(s>=startDay && s<=endDay+1) out.push({x:(s-startDay)*state.dayWidth, color, kind:"start", name:nm, date:b.startDate});
+    if(e>=startDay && e<=endDay+1) out.push({x:(e-startDay)*state.dayWidth, color, kind:"end",   name:nm, date:addDays(b.startDate,(b.days||1)-1)});
+  }
+  return out;
+}
+function edgeMarksHTML(startDay, endDay){
+  return edgeMarks(startDay,endDay).map(m=>
+    `<div class="edge-mark ${m.kind}" style="left:${m.x}px;${m.kind==="end"?`color:${m.color}`:`background:${m.color}`}" title="${escapeHtml(m.name)} ${m.kind==="start"?"시작":"종료"} ${m.date}"></div>`
+  ).join("");
+}
 function barSeg(b, startDay, endDay){
   const s=dayIndex(b.startDate), e=s+b.days;
   if (!(e>startDay && s<=endDay)) return null;
@@ -1344,7 +1372,9 @@ document.getElementById("f_del").addEventListener("click",()=>{ pushHistory(); s
 function clampInt(v,min,max){v=parseInt(v,10);if(isNaN(v))v=min;return Math.max(min,Math.min(max,v));}
 
 // ---------- 정의 추가/편집 ----------
-const defDlg=document.getElementById("defDlg"); let editingDefKey=null, defColor=DEFAULT_PALETTE[0];
+const defDlg=document.getElementById("defDlg"); let editingDefKey=null, defColor=DEFAULT_PALETTE[0], markColor="#d6313b";
+function syncMarkBox(){ document.getElementById("d_mkbox").style.display=document.getElementById("d_mark").checked?"":"none"; }
+document.getElementById("d_mark").addEventListener("change",syncMarkBox);
 // 타입에 맞는 DefKey 칸만 보인다. 단 반대쪽에 값이 남아 있으면 그것도 보여준다 —
 // 안 보이는 칸에 값이 숨어 있으면 추출 때 왜 그 값이 나오는지 알 수 없게 되기 때문.
 function syncDefKeyRows(){
@@ -1376,6 +1406,10 @@ function openDef(key){
   exclDiv.querySelectorAll("input").forEach(inp=>inp.addEventListener("change",()=>inp.closest(".excl-item").classList.toggle("on",inp.checked)));
   defColor = d?d.color:PAL()[Math.min(state.definitions.length, PAL().length-1)];
   renderSwatches(document.getElementById("d_sw"), ()=>defColor, c=>{defColor=c;}, false);
+  markColor = (d&&d.markColor)||"#d6313b";
+  document.getElementById("d_mark").checked = !!(d&&d.markEdges);
+  renderSwatches(document.getElementById("d_mksw"), ()=>markColor, c=>{markColor=c;}, false);
+  syncMarkBox();
   document.getElementById("d_del").style.display = d?"":"none";
   defDlg.showModal();
 }
@@ -1386,13 +1420,14 @@ document.getElementById("d_ok").addEventListener("click",()=>{
   const shareWith=document.getElementById("d_share").value;
   const memo=document.getElementById("d_memo").value;
   const exclusiveWith=[...document.querySelectorAll("#d_excl input:checked")].map(i=>i.value);
+  const markEdges=document.getElementById("d_mark").checked, mkColor=markColor;
   const exportKey=document.getElementById("d_ekey").value.trim();
   const tourneyDefKey=document.getElementById("d_tkey").value.trim();
   if(!name){ alert("이름을 입력하세요"); return; }
   pushHistory();
   // exportKey·tourneyDefKey = 추출 설정(📤)과 동일 필드. exportEventType 등 나머지 추출 항목은 추출 설정에서만 관리
-  if(editingDefKey){ const d=state.definitions.find(x=>x.key===editingDefKey); if(d){ d.name=name; d.eventType=eventType; d.days=days; d.color=defColor; d.shareWith=shareWith; d.memo=memo; d.exclusiveWith=exclusiveWith; d.exportKey=exportKey; d.tourneyDefKey=tourneyDefKey; state.bars.forEach(b=>{ if(b.defKey===editingDefKey){ b.days=days; b.eventType=eventType; } }); } }
-  else { state.definitions.push({ key:"def_"+uid(), name, eventType, days, color:defColor, exportKey, exportEventType:"", tourneyType:"", tourneyDefKey, shareWith, memo, exclusiveWith, exportTargets:[] }); }
+  if(editingDefKey){ const d=state.definitions.find(x=>x.key===editingDefKey); if(d){ d.name=name; d.eventType=eventType; d.days=days; d.color=defColor; d.shareWith=shareWith; d.memo=memo; d.exclusiveWith=exclusiveWith; d.exportKey=exportKey; d.tourneyDefKey=tourneyDefKey; d.markEdges=markEdges; d.markColor=mkColor; state.bars.forEach(b=>{ if(b.defKey===editingDefKey){ b.days=days; b.eventType=eventType; } }); } }
+  else { state.definitions.push({ key:"def_"+uid(), name, eventType, days, color:defColor, exportKey, exportEventType:"", tourneyType:"", tourneyDefKey, shareWith, memo, exclusiveWith, exportTargets:[], markEdges, markColor:mkColor }); }
   save(); renderPalette(); render(); defDlg.close();
 });
 document.getElementById("d_cancel").addEventListener("click",()=>defDlg.close());
@@ -1587,7 +1622,7 @@ function migrate(){ // 부스트 → 가챠부스트 (타입 분리 이전 데�
   if(!Array.isArray(state.planInstances)) state.planInstances=[];
   if(!state.dateNotes || typeof state.dateNotes!=="object") state.dateNotes={};   // 날짜 메모 — 말풍선 (구 편집본엔 없음)
   if(!state.dateTips  || typeof state.dateTips !=="object") state.dateTips ={};   // 날짜 메모 — 툴팁 (구 편집본엔 없음)
-  state.definitions.forEach(d=>{ if(d.shareWith===undefined) d.shareWith=""; if(d.memo===undefined) d.memo=""; if(!Array.isArray(d.exclusiveWith)) d.exclusiveWith=[]; if(!Array.isArray(d.exportTargets)) d.exportTargets=[]; if(d.exportKey===undefined) d.exportKey=""; if(d.exportEventType===undefined) d.exportEventType=""; if(d.tourneyType===undefined) d.tourneyType=""; if(d.tourneyDefKey===undefined) d.tourneyDefKey=""; if(d.regBlockMin===undefined) d.regBlockMin=""; if(d.fillLastGroup===undefined) d.fillLastGroup=""; });
+  state.definitions.forEach(d=>{ if(d.markEdges===undefined) d.markEdges=false; if(!d.markColor) d.markColor="#d6313b"; if(d.shareWith===undefined) d.shareWith=""; if(d.memo===undefined) d.memo=""; if(!Array.isArray(d.exclusiveWith)) d.exclusiveWith=[]; if(!Array.isArray(d.exportTargets)) d.exportTargets=[]; if(d.exportKey===undefined) d.exportKey=""; if(d.exportEventType===undefined) d.exportEventType=""; if(d.tourneyType===undefined) d.tourneyType=""; if(d.tourneyDefKey===undefined) d.tourneyDefKey=""; if(d.regBlockMin===undefined) d.regBlockMin=""; if(d.fillLastGroup===undefined) d.fillLastGroup=""; });
   if(state.liveGroupStart===undefined) state.liveGroupStart=1;
   if(state.liveIndexStart===undefined) state.liveIndexStart=1;
   if(state.liveFromDate===undefined) state.liveFromDate="";
@@ -2895,6 +2930,16 @@ function renderScheduleCanvas(A,B,title,dayW){
       ctx.restore();
     }
     ty+=bh; ctx.strokeStyle="#dfe3e8"; ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(gridX,ty-.5); ctx.lineTo(gridX+gridW,ty-.5); ctx.stroke();
+  }
+  // 시작·끝 강조선 (편집기 .edge-mark) — 오늘 선보다 먼저 깔아 오늘 선이 위로 오게 한다
+  for(const b of state.bars){
+    const d=defOf(b); if(!d || !d.markEdges || !types.includes(barType(b))) continue;
+    const so=daysBetween(A,b.startDate), eo=so+(b.days||1);
+    ctx.strokeStyle=d.markColor||"#d6313b"; ctx.lineWidth=2;
+    if(so>=0 && so<=N){ ctx.save(); ctx.setLineDash([]); ctx.beginPath();
+      ctx.moveTo(gridX+so*dayW+1,bodyY); ctx.lineTo(gridX+so*dayW+1,bodyBottom); ctx.stroke(); ctx.restore(); }
+    if(eo>=0 && eo<=N){ ctx.save(); ctx.setLineDash([5,4]); ctx.beginPath();
+      ctx.moveTo(gridX+eo*dayW-1,bodyY); ctx.lineTo(gridX+eo*dayW-1,bodyBottom); ctx.stroke(); ctx.restore(); }
   }
   // 오늘 세로선 (편집기 .today-stripe — 막대 위에 그린다)
   { const off=daysBetween(A,today); if(off>=0 && off<N){ ctx.fillStyle="#f5a623"; ctx.fillRect(gridX+off*dayW,bodyY,2,bodyH); } }
