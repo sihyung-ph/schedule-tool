@@ -199,6 +199,9 @@
   .cntrow .dot { width:11px; height:11px; border-radius:3px; flex:0 0 auto; }
   .cntrow .cn { flex:1; font-weight:600; color:#2a2f36; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .cntrow .cc { flex:0 0 auto; font-weight:700; color:#1f5fbf; }
+  .cntrow.swrow { cursor:pointer; }
+  .cntrow.swrow:hover { background:#eef5ff; }
+  .cntrow.swrow.cur { background:#f7f8fa; }
 
   .note-row { display:flex; border-bottom:1px solid #e2e4e8; background:#fffdf5; }
   .note-label { flex:0 0 var(--label-w); width:var(--label-w); position:sticky; left:0; z-index:4; background:#f7f8fa; border-right:1px solid #c4c8cd; font-size:11px; font-weight:600; color:#888; display:flex; align-items:center; padding:2px 8px; }
@@ -628,6 +631,16 @@
         <button type="button" class="danger" id="d_del">삭제</button>
         <div class="right"><button type="button" id="d_cancel">취소</button><button type="button" class="primary" id="d_ok">저장</button></div>
       </div>
+    </form>
+  </dialog>
+
+  <dialog id="swapDlg">
+    <form method="dialog" class="dlg" style="width:min(94vw,460px)">
+      <h3>🔄 대치 — 다른 스케쥴로 바꾸기</h3>
+      <div class="meta" style="margin:-6px 0 8px">지금 막대: <span id="sw_cur"></span></div>
+      <div class="meta" style="margin-bottom:8px"><b>시작일은 그대로</b> 두고 스케쥴만 바꿉니다. 기간은 고른 프리셋을 따르므로 <b>종료일은 달라질 수 있습니다.</b> 타입이 다르면 그 트랙으로 옮겨갑니다.</div>
+      <div id="sw_list" style="max-height:52vh;overflow:auto;border:1px solid #e0e3e8;border-radius:8px;background:#fff"></div>
+      <div class="actions"><div></div><div class="right"><button type="button" id="sw_cancel">취소</button></div></div>
     </form>
   </dialog>
 
@@ -1183,14 +1196,61 @@ function attachHandlers(){
 let ctxBarId=null;
 const ctxmenu=document.getElementById("ctxmenu");
 function showCtx(x,y,id){ ctxBarId=id; const b=state.bars.find(z=>z.id===id);
-  let items=`<div data-act="edit">✎ 수정</div>`;
+  let items=`<div data-act="edit">✎ 수정</div><div data-act="swap">🔄 대치</div>`;
   if(b&&b.planId){ const pi=instOf(b.planId); items+=`<div data-act="del" class="del">🗑 이 막대만 삭제</div><div data-act="planDel" class="del">🧩 플랜 통째 삭제${pi?` (${escapeHtml(pi.name)})`:""}</div>`; }
   else items+=`<div data-act="del" class="del">🗑 삭제</div>`;
   ctxmenu.innerHTML=items;
   ctxmenu.style.left=Math.min(x,window.innerWidth-160)+"px"; ctxmenu.style.top=Math.min(y,window.innerHeight-110)+"px"; ctxmenu.classList.add("show"); }
 function hideCtx(){ ctxmenu.classList.remove("show"); ctxBarId=null; }
+// ---------- 대치 (다른 프리셋으로 갈아끼우기) ----------
+// **시작일만 유지**한다. 기간은 새 프리셋 값을 따르므로 종료일은 달라질 수 있다(사용자 지정 규칙).
+// 트랙(eventType)도 새 프리셋을 따라가므로 막대가 다른 트랙으로 옮겨갈 수 있다.
+function swappedBar(bar, def){
+  if(!bar || !def) return null;
+  return Object.assign({}, bar, {
+    defKey: def.key,
+    eventType: def.eventType,
+    days: Math.max(1, def.days||1),
+    startDate: bar.startDate,          // 불변 — 대치의 핵심 규칙
+    labelOverride: ""                  // 이전 프리셋 이름이 남아 새 이름을 가리지 않게
+  });
+}
+const swapDlg=document.getElementById("swapDlg");
+let swapBarId=null;
+function openSwap(id){
+  const b=state.bars.find(z=>z.id===id); if(!b) return;
+  swapBarId=id;
+  const cur=defOf(b);
+  document.getElementById("sw_cur").innerHTML=`<span class="dot" style="background:${barColor(b)}"></span>`
+    +`<b>${escapeHtml(barName(b))}</b> · ${escapeHtml(barType(b))} · ${b.days}일 · <b>${b.startDate}</b> 시작`;
+  const byType={};
+  for(const d of state.definitions){ (byType[d.eventType||"미분류"]||(byType[d.eventType||"미분류"]=[])).push(d); }
+  let h="";
+  for(const ty of Object.keys(byType)){
+    h+=`<div class="cntgrp"><span>${escapeHtml(ty)}</span></div>`;
+    for(const d of byType[ty]){
+      const same=cur&&cur.key===d.key;
+      h+=`<div class="cntrow swrow${same?" cur":""}" data-key="${d.key}"><span class="dot" style="background:${d.color}"></span>`
+        +`<span class="cn">${escapeHtml(d.name)}${same?' <span style="color:#8a92a0;font-size:11px">(지금 이것)</span>':""}</span>`
+        +`<span class="cc">${d.days}일</span></div>`;
+    }
+  }
+  document.getElementById("sw_list").innerHTML=h||`<div style="padding:14px;color:#9aa0a8">스케쥴 프리셋이 없습니다.</div>`;
+  swapDlg.showModal();
+}
+document.getElementById("sw_list").addEventListener("click", e=>{
+  const row=e.target.closest(".swrow"); if(!row) return;
+  const b=state.bars.find(z=>z.id===swapBarId), d=state.definitions.find(x=>x.key===row.dataset.key);
+  if(!b||!d) return;
+  pushHistory();
+  Object.assign(b, swappedBar(b,d));
+  pruneInstances(); save(); renderPalette(); render();
+  swapDlg.close();
+});
+document.getElementById("sw_cancel").addEventListener("click",()=>swapDlg.close());
 ctxmenu.addEventListener("click", e=>{ const act=e.target.dataset.act; if(!act||!ctxBarId)return;
   if(act==="edit") openEdit(ctxBarId);
+  else if(act==="swap") openSwap(ctxBarId);
   else if(act==="del"){ pushHistory(); state.bars=state.bars.filter(b=>b.id!==ctxBarId); pruneInstances(); selectedSet=new Set(); selectedId=null; save(); render(); }
   else if(act==="planDel"){ const b=state.bars.find(z=>z.id===ctxBarId); if(b&&b.planId){ pushHistory(); const pid=b.planId; state.bars=state.bars.filter(x=>x.planId!==pid); pruneInstances(); selectedSet=new Set(); selectedId=null; save(); render(); } }
   hideCtx();
