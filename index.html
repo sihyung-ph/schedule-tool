@@ -491,6 +491,7 @@
         <div class="imgf"><label>종료일 B</label><input id="img_b" type="date"></div>
         <div class="imgf"><label>1일 너비(px)</label><input id="img_dayw" type="number" min="20" max="200" step="2" value="60" style="width:90px"></div>
         <div class="imgf grow"><label>제목</label><input id="img_title" type="text" placeholder="예: 6월 라이브 일정"></div>
+        <div class="imgf"><label>메모</label><label style="display:flex;align-items:center;gap:6px;font-weight:600;white-space:nowrap"><input id="img_memo" type="checkbox"> 이름 아래 메모 표시</label></div>
       </div>
       <div class="meta">흐리게(체크 끈) 트랙은 제외됨. 범위에 <b>온전히 안 들어오는(잘리는) 막대는 제외</b>. 값 바꾸면 즉시 미리보기 갱신. 이름 잘리면 <b>1일 너비</b>를 늘리세요.</div>
       <div class="img-preview-wrap"><img id="img_preview" alt="미리보기 — 기간을 정하면 표시됩니다"></div>
@@ -634,8 +635,8 @@
       <div class="row" id="d_tkrow"><label>토너 DefKey</label><input id="d_tkey" type="text" placeholder="토너 ContentId (예 Tournament_Arena)"></div>
       <div class="meta">📤 추출 설정의 같은 칸과 <b>같은 값</b>입니다 — 어느 쪽에서 고쳐도 함께 바뀝니다. 타입에 맞는 칸만 보이고, 다른 칸에 값이 남아 있으면 그것도 같이 보입니다.</div>
       <div class="row"><label>기간(일)</label><input id="d_days" type="number" min="1" value="3"></div>
-      <div class="row"><label>일정공유 대상</label><select id="d_share"></select></div>
-      <div class="meta">지정 시: 이 스케쥴은 대상과 같은 시작일·기간으로 함께 놓여야 함 (아니면 경고)</div>
+      <div class="row" style="align-items:flex-start"><label>일정공유 대상</label><div id="d_share" class="excl-list"></div></div>
+      <div class="meta">체크한 스케쥴과 <b>같은 시작일·기간</b>으로 함께 놓여야 함 (아니면 경고). 여러 개 선택 가능</div>
       <div class="row" style="align-items:flex-start"><label>겹침 금지</label><div id="d_excl" class="excl-list"></div></div>
       <div class="meta">체크한 스케쥴과 날짜가 겹치면 경고 (여러 개 가능)</div>
       <div class="row"><label>색상</label><div class="swatches" id="d_sw"></div></div>
@@ -770,6 +771,8 @@ function curMonthFirst(){ const n=new Date(); return n.getFullYear()+"-"+pad(n.g
 
 // ---------- 정의(스케쥴 템플릿)/트랙 ----------
 const EVENT_TYPES = ["가챠부스트","게임부스트","드랍부스트","라이브이벤트","토너먼트"];
+// shareWith 는 예전엔 문자열 하나였다 → 배열로 바뀜. 어느 쪽이 와도 배열로 읽는다.
+function shareList(d){ const v=d&&d.shareWith; return Array.isArray(v)?v.filter(Boolean):(v?[v]:[]); }
 function defOf(b){ return state.definitions.find(d=>d.key===b.defKey); }
 function barType(b){ const d=defOf(b); return (d&&d.eventType)||b.eventType||"미분류"; }
 function barColor(b){ return b.colorOverride || (defOf(b)||{}).color || "#bcaee0"; }
@@ -832,10 +835,12 @@ function computeViolations(){
     }
   }
   // 공유 규칙: 대상과 같은 시작일·기간으로 함께 놓여야
-  for(const b of state.bars){ const def=defOf(b); if(!def||!def.shareWith) continue;
-    const target=state.definitions.find(x=>x.key===def.shareWith); if(!target) continue;
-    const ok=state.bars.some(o=>o.defKey===def.shareWith && o.startDate===b.startDate && o.days===b.days);
-    if(!ok) add(dayIndex(b.startDate), `「${def.name}」은 「${target.name}」와 일정 공유 필요`);
+  for(const b of state.bars){ const def=defOf(b); if(!def) continue;
+    for(const key of shareList(def)){                       // 대상이 여럿이면 **전부** 만족해야 한다
+      const target=state.definitions.find(x=>x.key===key); if(!target) continue;
+      const ok=state.bars.some(o=>o.defKey===key && o.startDate===b.startDate && o.days===b.days);
+      if(!ok) add(dayIndex(b.startDate), `「${def.name}」은 「${target.name}」와 일정 공유 필요`);
+    }
   }
   // 겹침 금지 규칙
   for(let i=0;i<state.bars.length;i++) for(let j=i+1;j<state.bars.length;j++){
@@ -1487,8 +1492,11 @@ function openDef(key){
   document.getElementById("d_ekey").value = d?(d.exportKey||""):"";
   document.getElementById("d_tkey").value = d?(d.tourneyDefKey||""):"";
   syncDefKeyRows();
-  const shareSel=document.getElementById("d_share");
-  shareSel.innerHTML=`<option value="">(없음)</option>`+state.definitions.filter(x=>!d||x.key!==d.key).map(x=>`<option value="${x.key}"${d&&d.shareWith===x.key?" selected":""}>${escapeHtml(x.name)} · ${escapeHtml(x.eventType)}</option>`).join("");
+  const shareDiv=document.getElementById("d_share");
+  const shSet=new Set(shareList(d));
+  const shOthers=state.definitions.filter(x=>!d||x.key!==d.key);
+  shareDiv.innerHTML = shOthers.length ? shOthers.map(x=>`<label class="excl-item${shSet.has(x.key)?" on":""}"><input type="checkbox" value="${x.key}"${shSet.has(x.key)?" checked":""}><span class="dot" style="background:${x.color}"></span><span class="nm">${escapeHtml(x.name)}</span><span class="t">${escapeHtml(x.eventType)}</span></label>`).join("") : `<div style="color:#aaa;padding:6px">다른 스케쥴 없음</div>`;
+  shareDiv.querySelectorAll("input").forEach(inp=>inp.addEventListener("change",()=>inp.closest(".excl-item").classList.toggle("on",inp.checked)));
   const exclDiv=document.getElementById("d_excl");
   const exSet=new Set((d&&d.exclusiveWith)||[]);
   const others=state.definitions.filter(x=>!d||x.key!==d.key);
@@ -1507,7 +1515,7 @@ document.getElementById("d_ok").addEventListener("click",()=>{
   const name=document.getElementById("d_name").value.trim();
   const eventType=document.getElementById("d_type").value||EVENT_TYPES[0];
   const days=clampInt(document.getElementById("d_days").value,1,400);
-  const shareWith=document.getElementById("d_share").value;
+  const shareWith=[...document.querySelectorAll("#d_share input:checked")].map(i=>i.value);
   const memo=document.getElementById("d_memo").value;
   const exclusiveWith=[...document.querySelectorAll("#d_excl input:checked")].map(i=>i.value);
   const markEdges=document.getElementById("d_mark").checked, mkColor=markColor;
@@ -1664,8 +1672,10 @@ function openRules(){
   let h=`<b>고정 규칙</b> (코드, 변경 불가)<ul style="margin:4px 0 12px">`;
   for(const r of COVERAGE_RULES) h+=`<li>${escapeHtml(r.eventType)} 매일 최소 ${r.min}개 이상</li>`;
   h+=`</ul><b>일정공유 규칙</b> (스케쥴 편집창에서 「일정공유 대상」 지정)<ul style="margin:4px 0 8px">`;
-  const shares=state.definitions.filter(d=>d.shareWith);
-  if(shares.length){ for(const d of shares){ const t=state.definitions.find(x=>x.key===d.shareWith); h+=`<li>「${escapeHtml(d.name)}」 (${escapeHtml(d.eventType)}) ↔ 「${escapeHtml(t?t.name:"?")}」 같은 시작일·기간 필요</li>`; } }
+  const shares=state.definitions.filter(d=>shareList(d).length);
+  if(shares.length){ for(const d of shares){
+    const names=shareList(d).map(k=>{ const x=state.definitions.find(y=>y.key===k); return escapeHtml(x?x.name:"?"); }).join("」·「");
+    h+=`<li>「${escapeHtml(d.name)}」 (${escapeHtml(d.eventType)}) ↔ 「${names}」 같은 시작일·기간 필요</li>`; } }
   else h+=`<li style="color:#999">지정된 공유 규칙 없음 — 스케쥴 편집창에서 설정</li>`;
   h+=`</ul><b>겹침 금지 규칙</b> (스케쥴 편집창에서 「겹침 금지」 지정)<ul style="margin:4px 0 8px">`;
   const seen=new Set(); let any=false;
@@ -1712,7 +1722,7 @@ function migrate(){ // 부스트 → 가챠부스트 (타입 분리 이전 데�
   if(!Array.isArray(state.planInstances)) state.planInstances=[];
   if(!state.dateNotes || typeof state.dateNotes!=="object") state.dateNotes={};   // 날짜 메모 — 말풍선 (구 편집본엔 없음)
   if(!state.dateTips  || typeof state.dateTips !=="object") state.dateTips ={};   // 날짜 메모 — 툴팁 (구 편집본엔 없음)
-  state.definitions.forEach(d=>{ if(d.markEdges===undefined) d.markEdges=false; if(!d.markColor) d.markColor="#d6313b"; if(d.shareWith===undefined) d.shareWith=""; if(d.memo===undefined) d.memo=""; if(!Array.isArray(d.exclusiveWith)) d.exclusiveWith=[]; if(!Array.isArray(d.exportTargets)) d.exportTargets=[]; if(d.exportKey===undefined) d.exportKey=""; if(d.exportEventType===undefined) d.exportEventType=""; if(d.tourneyType===undefined) d.tourneyType=""; if(d.tourneyDefKey===undefined) d.tourneyDefKey=""; if(d.regBlockMin===undefined) d.regBlockMin=""; if(d.fillLastGroup===undefined) d.fillLastGroup=""; });
+  state.definitions.forEach(d=>{ if(d.markEdges===undefined) d.markEdges=false; if(!d.markColor) d.markColor="#d6313b"; if(!Array.isArray(d.shareWith)) d.shareWith=d.shareWith?[d.shareWith]:[]; if(d.memo===undefined) d.memo=""; if(!Array.isArray(d.exclusiveWith)) d.exclusiveWith=[]; if(!Array.isArray(d.exportTargets)) d.exportTargets=[]; if(d.exportKey===undefined) d.exportKey=""; if(d.exportEventType===undefined) d.exportEventType=""; if(d.tourneyType===undefined) d.tourneyType=""; if(d.tourneyDefKey===undefined) d.tourneyDefKey=""; if(d.regBlockMin===undefined) d.regBlockMin=""; if(d.fillLastGroup===undefined) d.fillLastGroup=""; });
   if(state.liveGroupStart===undefined) state.liveGroupStart=1;
   if(state.liveIndexStart===undefined) state.liveIndexStart=1;
   if(state.liveFromDate===undefined) state.liveFromDate="";
@@ -2945,7 +2955,8 @@ function renderScheduleCanvas(A,B,title,dayW){
   const daysBetween=(a,b)=>Math.round((parseD(b)-parseD(a))/86400000);
   const N=daysBetween(A,B)+1; if(N<1) return null;
   dayW=Math.max(20,Math.min(200, dayW||60));
-  const S=2, laneH=26, lanePad=4, nameH=20, headerH=46, titleH=60, pad=24;
+  const showMemo=!!state.imgShowMemo;                 // 이름 아래 프리셋 메모 표시 (옵션)
+  const S=2, laneH=showMemo?36:26, lanePad=4, nameH=20, headerH=46, titleH=60, pad=24;
   const FONT="system-ui,-apple-system,'Apple SD Gothic Neo','Malgun Gothic',sans-serif";
   const types=tracksList().filter(t=>!isDimmed(t));
   const barsIn=state.bars.filter(b=>{ const so=daysBetween(A,b.startDate), eo=so+b.days; return so>=0 && eo<=N && types.includes(barType(b)); }); // 범위에 온전히 들어오는 막대만 (잘리는 것 제외)
@@ -3034,9 +3045,17 @@ function renderScheduleCanvas(A,B,title,dayW){
       ctx.fillStyle=barColor(b); roundRectPath(ctx,x,by,ww,bh2,4); ctx.fill();
       ctx.strokeStyle="rgba(0,0,0,.18)"; ctx.lineWidth=1; ctx.stroke();
       ctx.save(); roundRectPath(ctx,x,by,ww,bh2,4); ctx.clip();
-      ctx.fillStyle="rgba(0,0,0,.16)"; roundRectPath(ctx,x+4,by+bh2/2-7,15,14,3); ctx.fill();
-      ctx.fillStyle="#1a1a1a"; ctx.font=`700 9px ${FONT}`; ctx.textAlign="center"; ctx.fillText(typeCode(barType(b)), x+11.5, by+bh2/2);
-      ctx.textAlign="left"; ctx.font=`600 11px ${FONT}`; ctx.fillText(barName(b), x+23, by+bh2/2);
+      const badgeY=showMemo?by+bh2/2-6:by+bh2/2;
+      ctx.fillStyle="rgba(0,0,0,.16)"; roundRectPath(ctx,x+4,badgeY-7,15,14,3); ctx.fill();
+      ctx.fillStyle="#1a1a1a"; ctx.font=`700 9px ${FONT}`; ctx.textAlign="center"; ctx.fillText(typeCode(barType(b)), x+11.5, badgeY);
+      const memo=showMemo ? String((defOf(b)||{}).memo||"").replace(/\s*\n+\s*/g," ").trim() : "";
+      ctx.textAlign="left";
+      if(memo){
+        ctx.font=`600 11px ${FONT}`; ctx.fillText(barName(b), x+23, by+bh2/2-6);
+        ctx.fillStyle="rgba(0,0,0,.62)"; ctx.font=`500 9px ${FONT}`; ctx.fillText(memo, x+23, by+bh2/2+7);
+      } else {
+        ctx.font=`600 11px ${FONT}`; ctx.fillText(barName(b), x+23, by+bh2/2);
+      }
       ctx.restore();
     }
     ty+=bh; ctx.strokeStyle="#dfe3e8"; ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(gridX,ty-.5); ctx.lineTo(gridX+gridW,ty-.5); ctx.stroke();
@@ -3075,8 +3094,10 @@ document.getElementById("imgExport").addEventListener("click",()=>{
   document.getElementById("img_a").value=state.startDate;
   document.getElementById("img_b").value=lastBarEnd()||addDays(state.startDate, Math.min(state.totalDays,state.daysPerRow)-1);
   if(!document.getElementById("img_title").value) document.getElementById("img_title").value="";
+  document.getElementById("img_memo").checked=!!state.imgShowMemo;
   genScheduleImage(); imgDlg.showModal();
 });
+document.getElementById("img_memo").addEventListener("change",e=>{ state.imgShowMemo=e.target.checked; save(); genScheduleImage(); });
 document.getElementById("img_regen").addEventListener("click",genScheduleImage);
 ["img_a","img_b","img_title","img_dayw"].forEach(id=>document.getElementById(id).addEventListener("input",genScheduleImage));
 document.getElementById("img_close").addEventListener("click",()=>imgDlg.close());
