@@ -189,6 +189,24 @@
   .cmplegend .sw.violation-unknown { background:#d16bd1; border-color:#7d2a7d; }
   .cmplegend .sw.nowline { background:linear-gradient(90deg,#f5a623 0 50%,#d6313b 50% 100%); }
   .cmplegend .sw.overlap { background-image:repeating-linear-gradient(45deg, rgba(178,59,48,.9) 0 4px, rgba(178,59,48,.5) 4px 8px); border-color:#b23b30; }
+  .cmpseg { overflow:hidden; }
+  .cmpsd { display:block; font-size:9px; line-height:16px; text-align:center; color:rgba(0,0,0,.62); font-weight:700; white-space:nowrap; }
+  .dlist { border-top:1px solid #d8dce2; background:#fcfdfe; }
+  .dlist > summary { cursor:pointer; padding:8px 12px; font-size:12px; font-weight:700; color:#5b6472; background:#f7f8fa; position:sticky; left:0; }
+  .drow { padding:7px 12px; border-top:1px solid #eef0f3; }
+  .drow.bad { background:#fff6f5; }
+  .drow .dk { font-size:11px; color:#8a92a0; margin-bottom:3px; }
+  .drow .dk b { color:#2a2f36; font-size:12px; margin-right:6px; }
+  .drow .dl { display:flex; align-items:flex-start; gap:6px; margin-top:2px; }
+  .drow .dn { flex:0 0 42px; font-size:10px; color:#a7afbd; line-height:18px; }
+  .drow .dv { display:flex; flex-wrap:wrap; gap:4px; }
+  .dchip { font-size:10px; font-weight:700; padding:1px 6px; border-radius:9px; border:1px solid rgba(0,0,0,.18); color:#2a2f36; white-space:nowrap; }
+  .dchip.same { background:#cfe3d4; } .dchip.ok-new { background:#9ec5f5; }
+  .dchip.ok-changed, .dchip.ok-removed { background:#f5d79e; } .dchip.ok-outrange { background:#e6e9ed; }
+  .dchip.violation-changed, .dchip.violation-removed, .dchip.violation-added, .dchip.violation-moved { background:#ef8a80; border-color:#b23b30; }
+  .dchip.violation-unknown { background:#d16bd1; border-color:#7d2a7d; color:#fff; }
+  .dchip.overlap { box-shadow:0 0 0 2px #b23b30 inset; }
+  .dnone { font-size:10px; color:#b9bfc7; font-style:italic; line-height:18px; }
   .cmpempty { padding:20px; color:#9aa0a8; font-size:13px; }
 
   .cntgrp { display:flex; justify-content:space-between; align-items:baseline; gap:8px; padding:6px 12px 5px; font-size:11px; font-weight:700; color:#8a92a0; background:#f7f8fa; border-bottom:1px solid #eef0f3; position:sticky; top:0; }
@@ -2703,10 +2721,6 @@ function buildTourneyDiff(liveRecords, genRecords, today, knownKeys){
   const violations=counts["violation-changed"]+counts["violation-removed"]+counts["violation-added"]+counts["violation-unknown"]+counts.overlap;
   return {rows, from:minD, to:maxD, today, arrived, counts, violations};
 }
-const DIFF_LABEL={ same:"그대로", "ok-new":"신규 추가", "ok-changed":"미래 변경", "ok-removed":"미래 삭제",
-  "violation-changed":"도래분 내용 변경", "violation-removed":"도래분 삭제·누락", "violation-added":"도래 날짜 추가",
-  "violation-moved":"도래분 인덱스 변경", "ok-outrange":"추출 범위 밖 (안 건드림)",
-  "violation-unknown":"편집기에 없는 토너 (툴 밖에서 추가됨)" };
 // 라이브 테이블 비교 — 토너와 같은 그림을 쓰되 단위가 「시즌」이 아니라 「행」이다.
 // 행 묶음 = 추출키(eventDefinitionKey). 같은 추출키의 행들이 한 레인에 늘어선다.
 // 라이브 테이블은 **행 단위 붙여넣기**라, 추출 범위 밖 과거 행은 건드리지 않으므로 문제가 아니다(ok-outrange).
@@ -2768,8 +2782,20 @@ function buildLiveDiff(liveRows, genRows, today, from, to){
   return {rows:list, from:minD, to:maxD, today, arrived, counts, violations};
 }
 const cmpDlg=document.getElementById("cmpDlg");
+const DIFF_LABEL={ same:"그대로", "ok-new":"신규 추가", "ok-changed":"미래 변경", "ok-removed":"미래 삭제",
+  "violation-changed":"도래분 내용 변경", "violation-removed":"도래분 삭제·누락", "violation-added":"도래 날짜 추가",
+  "violation-moved":"도래분 인덱스 변경", "ok-outrange":"추출 범위 밖 (안 건드림)",
+  "violation-unknown":"편집기에 없는 토너 (툴 밖에서 추가됨)" };
 // 두 검증(토너·라이브 테이블)이 같은 그림을 쓴다 — diff 모델만 다르고 그리는 방식은 동일.
 // d = {rows:[{sk,desc,live:[seg],gen:[seg],inLive,inGen}], from,to,today,arrived,counts,violations}
+// 날짜를 «읽을 수 있게» 만드는 포맷 — 툴팁에 숨기지 않고 화면에 찍는다.
+const mdOf=s=>String(s||"").slice(5).replace("-","/");          // 2026-08-06 → 08/06
+function segRangeText(x){ return `${mdOf(x.s)}~${mdOf(x.e)}`; }
+// 한 줄(운영툴/추출)의 날짜를 상태와 함께 텍스트로. 기존 데이터가 언제 얼마나 들어 있는지 이걸로 확인한다.
+function laneDateList(segs){
+  return (segs||[]).map(x=>({ text:segRangeText(x), status:x.status, overlap:!!x.overlap,
+    label:(DIFF_LABEL[x.status]||x.status)+(x.overlap?" · 겹침":"") }));
+}
 function renderDiffGrid(d, opt){
   const box=document.getElementById("cmp_body"), st=document.getElementById("cmp_status");
   const unit=(opt&&opt.unit)||"칸";
@@ -2785,7 +2811,8 @@ function renderDiffGrid(d, opt){
   const arrOff =(d.arrived>=d.from&&d.arrived<=d.to)?off(d.arrived):null;
   const seg=(x)=>{ const l=off(x.s), w=Math.max(3, off(x.e)-l);
     const t=`${x.s} ~ ${x.e} · ${DIFF_LABEL[x.status]||x.status}${x.overlap?" · ⚠ 시즌 겹침":""}${x.note?" · "+x.note:""}`;
-    return `<div class="cmpseg ${x.status}${x.overlap?" overlap":""}" style="left:${l}px;width:${w}px" title="${escapeHtml(t)}"></div>`; };
+    const inner = w>=30 ? `<span class="cmpsd">${mdOf(x.s)}</span>` : "";   // 자리가 되면 시작 날짜를 찍는다
+    return `<div class="cmpseg ${x.status}${x.overlap?" overlap":""}" style="left:${l}px;width:${w}px" title="${escapeHtml(t)}">${inner}</div>`; };
   let h=`<div class="cmpgrid">`;
   h+=`<div class="cmprow head"><div class="cmplabel"></div><div class="cmptrack" style="width:${W}px">${head}`
     +(todayOff!=null?`<div class="cmpnow" style="left:${todayOff}px"><span>오늘</span></div>`:"")
@@ -2799,7 +2826,18 @@ function renderDiffGrid(d, opt){
       +(arrOff!=null?`<div class="cmparr" style="left:${arrOff}px"></div>`:"")
       +`</div></div>`;
   }
-  box.innerHTML=h+`</div>`;
+  // 📋 날짜 목록 — 칸이 좁아 날짜를 못 찍는 경우에도 «언제 무엇이» 들어 있는지 확인할 수 있게
+  const chips=segs=>laneDateList(segs).map(c=>
+    `<span class="dchip ${c.status}${c.overlap?" overlap":""}" title="${escapeHtml(c.label)}">${c.text}</span>`).join("") || `<span class="dnone">없음</span>`;
+  let list=`<details class="dlist" open><summary>📋 날짜로 보기 — 어디에 무엇이 언제 들어 있는지</summary>`;
+  for(const r of d.rows){
+    const bad=r.live.concat(r.gen).some(x=>/^violation/.test(x.status)||x.overlap);
+    list+=`<div class="drow${bad?" bad":""}"><div class="dk"><b>${escapeHtml(r.sk)}</b>${r.desc?`<span>${escapeHtml(r.desc)}</span>`:""}</div>`
+      +`<div class="dl"><span class="dn">운영툴</span><span class="dv">${chips(r.live)}</span></div>`
+      +`<div class="dl"><span class="dn">추출</span><span class="dv">${chips(r.gen)}</span></div></div>`;
+  }
+  list+=`</details>`;
+  box.innerHTML=h+`</div>`+list;
   const c=d.counts;
   st.innerHTML=(d.violations
       ? `<b style="color:#c0392b">❌ 문제 ${d.violations}곳</b> — 빨간 칸을 확인하세요.`
