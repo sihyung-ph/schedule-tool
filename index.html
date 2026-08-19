@@ -107,6 +107,17 @@
   .imgf.grow input { width:100%; box-sizing:border-box; }
   #imgDlg .img-preview-wrap { flex:1; min-height:200px; max-height:66vh; overflow:auto; border:1px solid #e0e3e8; border-radius:10px; background:#f6f8fa; display:flex; align-items:center; justify-content:center; padding:10px; margin:8px 0; }
   #imgDlg .img-preview-wrap img { max-width:100%; display:block; box-shadow:0 2px 10px rgba(0,0,0,.12); border-radius:6px; }
+  #imgDlg .imgmain { display:flex; gap:10px; align-items:stretch; }
+  #imgDlg .imgmain .img-preview-wrap { flex:1; min-width:0; }
+  #imgDlg .imgside { flex:0 0 176px; width:176px; border:1px solid #e0e3e8; border-radius:8px; background:#fafbfc; padding:8px; display:flex; flex-direction:column; }
+  #imgDlg .imgside-h { font-size:11px; font-weight:700; color:#5b6472; margin-bottom:6px; }
+  #imgDlg .imgside-m { font-size:10px; color:#8a92a0; line-height:1.5; margin-top:8px; }
+  #imgDlg .tracksel { display:flex; flex-direction:column; gap:3px; overflow:auto; }
+  #imgDlg .trk { display:flex; align-items:center; gap:6px; padding:4px 6px; border:1px solid #e2e5ea; border-radius:6px; background:#fff; cursor:pointer; font-size:12px; color:#8a92a0; }
+  #imgDlg .trk.on { border-color:#a9c6f0; background:#f2f7ff; color:#2a2f36; font-weight:600; }
+  #imgDlg .trk input { margin:0; flex:0 0 auto; }
+  #imgDlg .trk .dot { width:10px; height:10px; border-radius:3px; flex:0 0 auto; }
+  #imgDlg .trk .nm { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   #imgDlg .actions button { padding:8px 16px; font-size:13px; }
   #tn_verify .vbox, #cl_verify .vbox { border-radius:8px; padding:9px 11px; border:1px solid; }
   #tn_verify .vbox.ok, #cl_verify .vbox.ok { background:#eaf7f0; border-color:#a9dcc5; color:#136c47; }
@@ -491,11 +502,20 @@
         <div class="imgf"><label>종료일 B</label><input id="img_b" type="date"></div>
         <div class="imgf"><label>1일 너비(px)</label><input id="img_dayw" type="number" min="20" max="200" step="2" value="60" style="width:90px"></div>
         <div class="imgf grow"><label>제목</label><input id="img_title" type="text" placeholder="예: 6월 라이브 일정"></div>
-        <div class="imgf"><label>메모</label><label style="display:flex;align-items:center;gap:6px;font-weight:600;white-space:nowrap"><input id="img_memo" type="checkbox"> 이름 아래 메모 표시</label></div>
+        <div class="imgf"><label>표시</label><div style="display:flex;gap:12px;flex-wrap:wrap">
+          <label style="display:flex;align-items:center;gap:6px;font-weight:600;white-space:nowrap"><input id="img_memo" type="checkbox"> 이름 아래 메모</label>
+          <label style="display:flex;align-items:center;gap:6px;font-weight:600;white-space:nowrap"><input id="img_notes" type="checkbox"> 날짜 메모 말풍선</label>
+        </div></div>
       </div>
-      <div class="row" style="align-items:flex-start;margin-top:2px"><label>넣을 카테고리</label><div id="img_tracks" class="excl-list"></div></div>
-      <div class="meta">체크 끈 카테고리는 이미지에서 <b>통째로 빠집니다</b>(편집기의 「흐리게」와는 별개). 범위에 <b>온전히 안 들어오는(잘리는) 막대는 제외</b>. 값 바꾸면 즉시 미리보기 갱신. 이름 잘리면 <b>1일 너비</b>를 늘리세요.</div>
-      <div class="img-preview-wrap"><img id="img_preview" alt="미리보기 — 기간을 정하면 표시됩니다"></div>
+      <div class="meta">범위에 <b>온전히 안 들어오는(잘리는) 막대는 제외</b>. 값 바꾸면 즉시 미리보기 갱신. 이름 잘리면 <b>1일 너비</b>를 늘리세요.</div>
+      <div class="imgmain">
+        <div class="img-preview-wrap"><img id="img_preview" alt="미리보기 — 기간을 정하면 표시됩니다"></div>
+        <aside class="imgside">
+          <div class="imgside-h">넣을 카테고리</div>
+          <div id="img_tracks" class="tracksel"></div>
+          <div class="imgside-m">체크 끈 카테고리는 이미지에서 <b>통째로 빠집니다</b>. 편집기의 「흐리게」와는 별개입니다.</div>
+        </aside>
+      </div>
       <div class="meta" id="img_status" style="min-height:14px"></div>
       <div class="actions"><div><button type="button" id="img_regen">↻ 다시 생성</button></div><div class="right"><button type="button" id="img_close">닫기</button><button type="button" id="img_copy">📋 클립보드 복사</button><button type="button" class="primary" id="img_save">⬇ PNG 저장</button></div></div>
     </form>
@@ -2996,7 +3016,7 @@ function renderScheduleCanvas(A,B,title,dayW){
   const NOTE_LH=22, NOTE_BH=17, NOTE_PADX=8;
   const mctx=document.createElement("canvas").getContext("2d"); mctx.font=`700 11px ${FONT}`;
   const noteItems=[]; const noteLineEnd=[];
-  { const notes=state.dateNotes||{};
+  { const notes=(state.imgShowNotes===false)?{}:(state.dateNotes||{});   // 날짜 메모 말풍선 표시 옵션
     for(let i=0;i<N;i++){ const ds=addDays(A,i), txt=notes[ds]; if(!txt) continue;
       const w=mctx.measureText(txt).width+NOTE_PADX*2, x=gridX+i*dayW+dayW/2;
       let li=0; while(li<noteLineEnd.length && noteLineEnd[li] > x-w/2-6) li++;
@@ -3122,15 +3142,17 @@ document.getElementById("imgExport").addEventListener("click",()=>{
   document.getElementById("img_b").value=lastBarEnd()||addDays(state.startDate, Math.min(state.totalDays,state.daysPerRow)-1);
   if(!document.getElementById("img_title").value) document.getElementById("img_title").value="";
   document.getElementById("img_memo").checked=!!state.imgShowMemo;
+  document.getElementById("img_notes").checked=state.imgShowNotes!==false;
   renderImgTracks();
   genScheduleImage(); imgDlg.showModal();
 });
 document.getElementById("img_memo").addEventListener("change",e=>{ state.imgShowMemo=e.target.checked; save(); genScheduleImage(); });
+document.getElementById("img_notes").addEventListener("change",e=>{ state.imgShowNotes=e.target.checked; save(); genScheduleImage(); });
 function renderImgTracks(){
   const box=document.getElementById("img_tracks"), all=tracksList(), hide=new Set(state.imgHideTypes||[]);
-  box.innerHTML = all.length ? all.map(ty=>`<label class="excl-item${hide.has(ty)?"":" on"}"><input type="checkbox" value="${escapeHtml(ty)}"${hide.has(ty)?"":" checked"}><span class="dot" style="background:${typeColor(ty)}"></span><span class="nm">${escapeHtml(ty)}</span></label>`).join("") : `<div style="color:#aaa;padding:6px">트랙 없음</div>`;
+  box.innerHTML = all.length ? all.map(ty=>`<label class="trk${hide.has(ty)?"":" on"}"><input type="checkbox" value="${escapeHtml(ty)}"${hide.has(ty)?"":" checked"}><span class="dot" style="background:${typeColor(ty)}"></span><span class="nm">${escapeHtml(ty)}</span></label>`).join("") : `<div style="color:#aaa;padding:6px;font-size:12px">트랙 없음</div>`;
   box.querySelectorAll("input").forEach(inp=>inp.addEventListener("change",()=>{
-    inp.closest(".excl-item").classList.toggle("on",inp.checked);
+    inp.closest(".trk").classList.toggle("on",inp.checked);
     const s=new Set(state.imgHideTypes||[]);
     inp.checked?s.delete(inp.value):s.add(inp.value);
     state.imgHideTypes=[...s]; save(); genScheduleImage();
