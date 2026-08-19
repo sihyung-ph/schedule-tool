@@ -637,7 +637,7 @@
       <div class="meta">📤 추출 설정의 같은 칸과 <b>같은 값</b>입니다 — 어느 쪽에서 고쳐도 함께 바뀝니다. 타입에 맞는 칸만 보이고, 다른 칸에 값이 남아 있으면 그것도 같이 보입니다.</div>
       <div class="row"><label>기간(일)</label><input id="d_days" type="number" min="1" value="3"></div>
       <div class="row" style="align-items:flex-start"><label>일정공유 대상</label><div id="d_share" class="excl-list"></div></div>
-      <div class="meta">체크한 스케쥴과 <b>같은 시작일·기간</b>으로 함께 놓여야 함 (아니면 경고). 여러 개 선택 가능</div>
+      <div class="meta">체크한 스케쥴 <b>중 하나라도</b> 같은 시작일·기간으로 함께 놓이면 통과 (하나도 없으면 경고). 여러 개 선택 가능</div>
       <div class="row" style="align-items:flex-start"><label>겹침 금지</label><div id="d_excl" class="excl-list"></div></div>
       <div class="meta">체크한 스케쥴과 날짜가 겹치면 경고 (여러 개 가능)</div>
       <div class="row"><label>색상</label><div class="swatches" id="d_sw"></div></div>
@@ -773,6 +773,16 @@ function curMonthFirst(){ const n=new Date(); return n.getFullYear()+"-"+pad(n.g
 // ---------- 정의(스케쥴 템플릿)/트랙 ----------
 const EVENT_TYPES = ["가챠부스트","게임부스트","드랍부스트","라이브이벤트","토너먼트"];
 // shareWith 는 예전엔 문자열 하나였다 → 배열로 바뀜. 어느 쪽이 와도 배열로 읽는다.
+// 공유 대상이 여럿이면 **하나라도** 같은 시작일·기간이면 통과 (2026-08-15 사용자 결정).
+function shareSatisfied(bar, keys, bars){
+  return (keys||[]).some(k=>(bars||[]).some(o=>o.defKey===k && o.startDate===bar.startDate && o.days===bar.days));
+}
+// 하나도 못 맞췄을 때, 가장 도움이 되는 사유 하나를 고른다 — 같은 날 있는데 기간만 다른 경우를 우선 알린다.
+function shareMissAll(bar, keys, bars){
+  const reasons=(keys||[]).map(k=>shareMiss(bar,k,bars)).filter(Boolean);
+  const lenIssue=reasons.find(r=>/기간이 다름/.test(r));
+  return lenIssue || reasons[0] || "대상 없음";
+}
 // 공유 대상이 «왜» 안 맞는지 한 줄로. null 이면 만족.
 // 같은 날 시작한 대상이 있는데 기간만 다른 경우를 «없음» 이라고만 하면 사용자가 원인을 못 찾는다.
 function shareMiss(bar, key, bars){
@@ -846,12 +856,11 @@ function computeViolations(){
     }
   }
   // 공유 규칙: 대상과 같은 시작일·기간으로 함께 놓여야
-  for(const b of state.bars){ const def=defOf(b); if(!def) continue;
-    for(const key of shareList(def)){                       // 대상이 여럿이면 **전부** 만족해야 한다
-      const target=state.definitions.find(x=>x.key===key); if(!target) continue;
-      const why=shareMiss(b, key, state.bars);              // 왜 안 맞는지까지 알려준다
-      if(why) add(dayIndex(b.startDate), `「${def.name}」은 「${target.name}」와 일정 공유 필요 — ${why}`);
-    }
+  for(const b of state.bars){ const def=defOf(b); const keys=shareList(def);
+    if(!def || !keys.length) continue;
+    if(shareSatisfied(b, keys, state.bars)) continue;       // 여럿 중 **하나라도** 맞으면 통과
+    const names=keys.map(k=>{ const x=state.definitions.find(y=>y.key===k); return x?x.name:"?"; });
+    add(dayIndex(b.startDate), `「${def.name}」은 「${names.join("」·「")}」 중 하나와 일정 공유 필요 — ${shareMissAll(b, keys, state.bars)}`);
   }
   // 겹침 금지 규칙
   for(let i=0;i<state.bars.length;i++) for(let j=i+1;j<state.bars.length;j++){
@@ -1686,7 +1695,7 @@ function openRules(){
   const shares=state.definitions.filter(d=>shareList(d).length);
   if(shares.length){ for(const d of shares){
     const names=shareList(d).map(k=>{ const x=state.definitions.find(y=>y.key===k); return escapeHtml(x?x.name:"?"); }).join("」·「");
-    h+=`<li>「${escapeHtml(d.name)}」 (${escapeHtml(d.eventType)}) ↔ 「${names}」 같은 시작일·기간 필요</li>`; } }
+    h+=`<li>「${escapeHtml(d.name)}」 (${escapeHtml(d.eventType)}) ↔ 「${names}」 <b>중 하나</b>와 같은 시작일·기간 필요</li>`; } }
   else h+=`<li style="color:#999">지정된 공유 규칙 없음 — 스케쥴 편집창에서 설정</li>`;
   h+=`</ul><b>겹침 금지 규칙</b> (스케쥴 편집창에서 「겹침 금지」 지정)<ul style="margin:4px 0 8px">`;
   const seen=new Set(); let any=false;
