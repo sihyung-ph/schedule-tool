@@ -3115,10 +3115,11 @@ function renderScheduleCanvas(A,B,title,dayW){
         const memo=String((defOf(b)||{}).memo||"").replace(/\s*\n+\s*/g," ").trim();
         if(memo){
           const my=by+bh2+1;
-          ctx.fillStyle="#ffffff"; ctx.strokeStyle="rgba(0,0,0,.10)"; ctx.lineWidth=1;
+          // 흰 배경과 겹쳐 안 보이던 문제 → 아이보리로 채우고 테두리도 살짝 진하게
+          ctx.fillStyle="#fbf4e2"; ctx.strokeStyle="#ded0aa"; ctx.lineWidth=1;
           roundRectPath(ctx,x,my,ww,memoH-2,3); ctx.fill(); ctx.stroke();
           ctx.save(); roundRectPath(ctx,x,my,ww,memoH-2,3); ctx.clip();
-          ctx.fillStyle="#5b6472"; ctx.font=`500 9px ${FONT}`; ctx.textAlign="left"; ctx.textBaseline="middle";
+          ctx.fillStyle="#6a5f45"; ctx.font=`500 9px ${FONT}`; ctx.textAlign="left"; ctx.textBaseline="middle";
           ctx.fillText(memo, x+5, my+(memoH-2)/2);
           ctx.restore();
         }
