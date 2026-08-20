@@ -182,6 +182,7 @@
   .cmpseg.ok-new { background:#9ec5f5; }
   .cmpseg.ok-changed, .cmpseg.ok-removed { background:#f5d79e; }
   .cmpseg.ok-outrange { background:#e6e9ed; }
+  .cmpseg.warn-key { background:#f5b199; border-color:#c8622f; box-shadow:0 0 0 1px #c8622f inset; }
   .cmpseg.violation-moved { background:#ef8a80; border-color:#b23b30; }
   .cmpseg.violation-unknown { background:#d16bd1; border-color:#7d2a7d; }
   .cmpseg.violation-changed, .cmpseg.violation-removed, .cmpseg.violation-added { background:#ef8a80; border-color:#b23b30; }
@@ -196,6 +197,7 @@
   .cmplegend .sw.same { background:#cfe3d4; }
   .cmplegend .sw.ok-new { background:#9ec5f5; }
   .cmplegend .sw.ok-changed { background:#f5d79e; }
+  .cmplegend .sw.warn-key { background:#f5b199; border-color:#c8622f; }
   .cmplegend .sw.violation-changed { background:#ef8a80; border-color:#b23b30; }
   .cmplegend .sw.violation-unknown { background:#d16bd1; border-color:#7d2a7d; }
   .cmplegend .sw.nowline { background:linear-gradient(90deg,#f5a623 0 50%,#d6313b 50% 100%); }
@@ -214,6 +216,7 @@
   .dchip { font-size:10px; font-weight:700; padding:1px 6px; border-radius:9px; border:1px solid rgba(0,0,0,.18); color:#2a2f36; white-space:nowrap; }
   .dchip.same { background:#cfe3d4; } .dchip.ok-new { background:#9ec5f5; }
   .dchip.ok-changed, .dchip.ok-removed { background:#f5d79e; } .dchip.ok-outrange { background:#e6e9ed; }
+  .dchip.warn-key { background:#f5b199; border-color:#c8622f; }
   .dchip.violation-changed, .dchip.violation-removed, .dchip.violation-added, .dchip.violation-moved { background:#ef8a80; border-color:#b23b30; }
   .dchip.violation-unknown { background:#d16bd1; border-color:#7d2a7d; color:#fff; }
   .dchip.overlap { box-shadow:0 0 0 2px #b23b30 inset; }
@@ -402,6 +405,15 @@
           <tr><td><b>확인 못 한 필드</b></td><td>운영툴 데이터의 그 칸이 <b>비어 있어</b> 비교를 못 한 항목 — 시트에서 뒤쪽 컬럼이 잘려 복사되면 흔히 발생. 그 값도 검사받으려면 컬럼까지 포함해 다시 복사</td></tr>
         </table></div>
 
+      <div class="vinfo-sec"><div class="vinfo-h warn">🟡 노란색이 뜨는 경우 (전부)</div>
+        <div>노란색 = <b>도래 경계(오늘+1일) 뒤</b>라서 아직 플레이어에게 안 보인 구간의 변화입니다. 막지 않지만 «내가 의도한 변경인지»는 확인하세요.</div>
+        <table class="vinfo-t">
+          <tr><td><b>미래 변경</b></td><td>같은 이벤트(같은 시작일·추출키)가 양쪽에 있는데 <b>내용이 다름</b> — 종료일·기간·타입·설명·조건(openCondition·conditionValue·expireCondition)·spareTime 중 하나라도. 키는 그대로.</td></tr>
+          <tr><td><b>미래 삭제</b></td><td>운영툴에는 있는데 이번 추출에 <b>없음</b>. 미래 구간이라 지워도 안전.</td></tr>
+        </table>
+        <div style="margin-top:8px"><b style="color:#c8622f">주황색(키 변경)은 노란색과 다릅니다.</b> 미래 구간이지만 그 행의 <b>키(<code>EventSchedule_그룹_인덱스</code>)가 바뀌는</b> 경우입니다. 지금 당장 라이브를 깨지는 않아도, <b>키는 한 번 정해지면 계속 그 행을 가리키는 주소</b>라서 바뀌면 나중에 이 행을 다시 갱신할 때 엉뚱한 자리를 덮을 수 있습니다. 시작 인덱스를 잘못 잡았을 때 주로 나오므로 <b>인덱스를 맞춰 다시 뽑는 것을 권합니다.</b></div>
+        <div style="margin-top:6px">회색(<b>추출 범위 밖</b>)은 아예 건드리지 않는 행이라 무해합니다.</div>
+      </div>
       <div class="vinfo-sec"><div class="vinfo-h">검증하지 않는 것</div>
         <div>· <b>운영툴 데이터에 비어 있는 칸</b> — “모르는 값”으로 보고 비교에서 빼고, 「확인 못 한 필드」로 알립니다 (빈 칸을 위반으로 세면 잘려 복사된 경우 전부 위반이 됨)<br>
              · <b>미래 이벤트끼리의 차이</b> — 변경이 자유이므로 개수만 알려줍니다<br>
@@ -551,8 +563,8 @@
       <div class="meta">같은 <b>토너 DefKey</b> 막대들 → 1개 컨텐츠로 묶임. ContentId = <code>토너 DefKey</code> 그대로, 각 막대 = CustomSeasonData(시즌). DefKey 는 📤 추출 설정에서 입력.</div>
       <div class="row"><label>이 날짜부터</label><input id="tn_from" type="date"></div>
       <div class="meta">비우면 전체. 지정 시 <b>시작일이 이 날짜 이후(포함)</b>인 막대만 시즌에 포함.<br><b>덮어쓰기가 아니라 이어붙이기입니다</b> — 이 날짜 <b>앞</b>의 운영툴 기존 시즌은 아래 JSON 에서 그대로 가져와 유지합니다. 경계에 걸쳐 새 시즌과 겹치면 <b>위반</b>으로 잡힙니다.</div>
-      <details open style="margin:10px 0">
-        <summary style="cursor:pointer;font-weight:600;font-size:13px">⚙ 고정값 설정 (모든 스케쥴 토너 공통)</summary>
+      <details style="margin:10px 0">
+        <summary style="cursor:pointer;font-weight:600;font-size:13px">⚙ 고정값 설정 (모든 스케쥴 토너 공통) — 거의 바꿀 일 없음</summary>
         <div class="tnsetup">
           <div class="tnf"><div class="tnlbl">카테고리 ID <code>CategoryIds</code></div><input id="tn_cat" type="text" placeholder="Account"><div class="tnhint">토너 그룹 매칭 시 내려올 플레이데이터 키. 쉼표로 여러개. (스케쥴 토너 = Account)</div></div>
           <div class="tnf"><div class="tnlbl">채널 <code>SeparateByUserTags</code></div><input id="tn_chan" type="text" placeholder="0"><div class="tnhint">매칭그룹 필터를 서버 채널(<b>ChannelId</b>)로 사용. <b>0 = ChannelId 0</b> (기본 채널). 쉼표로 여러개.</div></div>
@@ -595,7 +607,7 @@
   <dialog id="exportDlg">
     <form method="dialog" class="dlg">
       <h3>📤 추출 설정</h3>
-      <div style="font-size:12px;color:#888;margin-bottom:8px">각 스케쥴이 어떤 추출 대상에 포함될지 체크 (즉시 저장). <b>등록차단·마지막그룹채움</b>은 비우면 「토너먼트 추출 → 고정값 설정」의 기본값 사용.</div>
+      <div style="font-size:12px;color:#888;margin-bottom:8px">각 스케쥴이 어떤 추출 대상에 포함될지 체크 (즉시 저장).</div>
       <div id="exportMatrix" style="max-height:55vh;overflow:auto"></div>
       <div class="actions"><div></div><div class="right"><button type="button" class="primary" id="export_ok">닫기</button></div></div>
     </form>
@@ -692,6 +704,7 @@
         <span><i class="sw same"></i><b>초록</b> 그대로 — 기존과 같음 (문제 없음)</span>
         <span><i class="sw ok-new"></i><b>파랑</b> 신규 — 기존에 없던 것을 새로 추가 (정상)</span>
         <span><i class="sw ok-changed"></i><b>노랑</b> 미래 변경·삭제 — 아직 안 보인 구간이라 허용</span>
+        <span><i class="sw warn-key"></i><b>주황</b> 키 변경 — 아직 안 도래했지만 <b>인덱스가 바뀜</b> (확인 권장, 라이브 테이블만)</span>
         <span><i class="sw violation-changed"></i><b>빨강</b> 문제 — 이미 도래한 것을 바꾸거나 지우거나 끼워넣음</span>
         <span><i class="sw violation-unknown"></i><b>보라</b> 편집기에 없는 토너 — 운영툴에서 직접 추가됨 (토너 검증만)</span>
         <span><i class="sw overlap"></i>빗금 — 기간 겹침</span>
@@ -2162,8 +2175,8 @@ function openExportSetup(){
   const m=document.getElementById("exportMatrix");
   if(!state.definitions.length){ m.innerHTML=`<div style="color:#aaa;padding:12px">스케쥴 프리셋이 없습니다.</div>`; exportDlg.showModal(); return; }
   const byType={}; for(const d of state.definitions){ (byType[d.eventType||"미분류"]||(byType[d.eventType||"미분류"]=[])).push(d); }
-  const colN=6+EXPORT_TARGETS.length;
-  let h=`<table class="exmatrix"><thead><tr><th class="nmcol">스케쥴</th><th>이벤트 DefKey</th><th>이벤트 타입(추출)</th><th>토너 DefKey</th><th title="시즌 종료 전 신규 등록 차단 시간(분). 0=차단 안함. 비우면 고정값 기본값 사용">등록차단(분)</th><th title="등록 차단 후 마지막 그룹 채워넣기 (노윈도우 전용). 비우면 고정값 기본값 사용">마지막그룹<br>채움</th>${EXPORT_TARGETS.map(t=>`<th>${escapeHtml(t.label)}</th>`).join("")}</tr></thead><tbody>`;
+  const colN=4+EXPORT_TARGETS.length;
+  let h=`<table class="exmatrix"><thead><tr><th class="nmcol">스케쥴</th><th>이벤트 DefKey</th><th>이벤트 타입(추출)</th><th>토너 DefKey</th>${EXPORT_TARGETS.map(t=>`<th>${escapeHtml(t.label)}</th>`).join("")}</tr></thead><tbody>`;
   for(const type of Object.keys(byType)){
     h+=`<tr class="grp"><td colspan="${colN}">${escapeHtml(type)}</td></tr>`;
     for(const d of byType[type]){ const set=new Set(d.exportTargets||[]);
@@ -2171,9 +2184,7 @@ function openExportSetup(){
         `<td><input type="text" class="extxt" data-def="${d.key}" data-f="exportKey" value="${escapeHtml(d.exportKey||"")}" placeholder="eventDefinitionKey"></td>`+
         `<td><input type="text" class="extxt" data-def="${d.key}" data-f="exportEventType" value="${escapeHtml(d.exportEventType||"")}" placeholder="테이블용 타입"></td>`+
         `<td><input type="text" class="extxt" data-def="${d.key}" data-f="tourneyDefKey" value="${escapeHtml(d.tourneyDefKey||"")}" placeholder="토너 ContentId (예 Tournament_Arena)"></td>`+
-        `<td><input type="number" min="0" class="extxt" data-def="${d.key}" data-f="regBlockMin" value="${escapeHtml(d.regBlockMin==null?"":String(d.regBlockMin))}" placeholder="기본값" style="width:74px"></td>`+
-        `<td><select class="exsel" data-def="${d.key}" data-f="fillLastGroup"><option value=""${!d.fillLastGroup?" selected":""}>기본값</option><option value="1"${d.fillLastGroup==="1"?" selected":""}>예</option><option value="0"${d.fillLastGroup==="0"?" selected":""}>아니오</option></select></td>`+
-        EXPORT_TARGETS.map(t=>`<td class="ck"><input type="checkbox" data-def="${d.key}" data-tgt="${t.key}"${set.has(t.key)?" checked":""}></td>`).join("")+`</tr>`;
+                        EXPORT_TARGETS.map(t=>`<td class="ck"><input type="checkbox" data-def="${d.key}" data-tgt="${t.key}"${set.has(t.key)?" checked":""}></td>`).join("")+`</tr>`;
     }
   }
   h+=`</tbody></table>`;
@@ -2487,10 +2498,9 @@ function buildTournamentJSON(def, fromDate){
     const days0=arr[0].days; if(arr.some(b=>b.days!==days0)) durWarn.push(key);
     const fdef=defOf(arr[0]);
     // 등록차단·마지막그룹채움: 프리셋(매트릭스) 값이 있으면 그걸, 비어있으면 고정값 기본값
-    const rbStr=(fdef&&fdef.regBlockMin!=null)?String(fdef.regBlockMin).trim():"";
-    const regBlockedMin=(rbStr!=="" && !isNaN(parseInt(rbStr,10))) ? parseInt(rbStr,10) : (parseInt(def.RegisterBlockedMin,10)||0);
-    const flStr=(fdef&&fdef.fillLastGroup!=null)?String(fdef.fillLastGroup):"";
-    const fillLast=(flStr==="1"||flStr==="0") ? (flStr==="1") : !!def.FillInLastGroupAfterRegisterBlockedMin;
+    // 등록차단·마지막그룹채움 = 「고정값 설정」 전역값만 사용 (프리셋별 override 는 2026-08-16 폐기)
+    const regBlockedMin=parseInt(def.RegisterBlockedMin,10)||0;
+    const fillLast=!!def.FillInLastGroupAfterRegisterBlockedMin;
     const liveRec=liveMap.get(cid);
     const liveIsSched = !!(liveRec && liveRec.SeasonSetting && Array.isArray(liveRec.SeasonSetting.CustomSeasonDatas));
     if(inherit && liveIsSched){
@@ -2792,7 +2802,7 @@ function buildLiveDiff(liveRows, genRows, today, from, to){
   const endOf=r=>r.endDate||addDays(r.startDate, Math.max(1, r.days||1));
   let minD="", maxD="";
   const track=d=>{ if(!d) return; if(!minD||d<minD) minD=d; if(d>maxD) maxD=d; };
-  const counts={same:0,"ok-new":0,"ok-changed":0,"ok-removed":0,"ok-outrange":0,
+  const counts={same:0,"ok-new":0,"ok-changed":0,"ok-removed":0,"ok-outrange":0,"warn-key":0,
     "violation-changed":0,"violation-removed":0,"violation-added":0,"violation-moved":0};
   const rows=new Map();
   const put=(r, lane, segStatus, note)=>{
@@ -2808,7 +2818,7 @@ function buildLiveDiff(liveRows, genRows, today, from, to){
     ls.forEach((l,i)=>{
       const g=gs[i]; let stt, note=l.pk;
       if(!g) stt = l.startDate>arrived ? "ok-removed" : (inRange(l) ? "violation-removed" : "ok-outrange");
-      else if(g.pk!==l.pk) stt = l.startDate>arrived ? "ok-changed" : "violation-moved", note=`${l.pk} → ${g.pk}`;
+      else if(g.pk!==l.pk) stt = l.startDate>arrived ? "warn-key" : "violation-moved", note=`${l.pk} → ${g.pk}`;
       else { const df=diffOf(l,g); stt = df.length ? (l.startDate>arrived?"ok-changed":"violation-changed") : "same";
              if(df.length) note=`${l.pk} · ${df.join("·")}`; }
       put(l,"live",stt,note).inLive=true;
@@ -2821,7 +2831,7 @@ function buildLiveDiff(liveRows, genRows, today, from, to){
       if(!l){ stt = g.startDate>arrived ? "ok-new" : "violation-added";
         const taken=lByPk.get(g.pk);
         if(taken && semOf(taken)!==sem && g.startDate<=arrived) note=`${g.pk} — 기존 「${taken.startDate} ${taken.name||""}」 자리를 덮어씀`; }
-      else if(g.pk!==l.pk) stt = g.startDate>arrived ? "ok-changed" : "violation-moved", note=`${l.pk} → ${g.pk}`;
+      else if(g.pk!==l.pk) stt = g.startDate>arrived ? "warn-key" : "violation-moved", note=`${l.pk} → ${g.pk}`;
       else { const df=diffOf(l,g); stt = df.length ? (g.startDate>arrived?"ok-changed":"violation-changed") : "same";
              if(df.length) note=`${g.pk} · ${df.join("·")}`; }
       put(g,"gen",stt,note).inGen=true;
@@ -2836,6 +2846,7 @@ const cmpDlg=document.getElementById("cmpDlg");
 const DIFF_LABEL={ same:"그대로", "ok-new":"신규 추가", "ok-changed":"미래 변경", "ok-removed":"미래 삭제",
   "violation-changed":"도래분 내용 변경", "violation-removed":"도래분 삭제·누락", "violation-added":"도래 날짜 추가",
   "violation-moved":"도래분 인덱스 변경", "ok-outrange":"추출 범위 밖 (안 건드림)",
+  "warn-key":"⚠ 아직 안 도래했지만 키(인덱스)가 바뀜 — 확인 권장",
   "violation-unknown":"편집기에 없는 토너 (툴 밖에서 추가됨)" };
 // 두 검증(토너·라이브 테이블)이 같은 그림을 쓴다 — diff 모델만 다르고 그리는 방식은 동일.
 // d = {rows:[{sk,desc,live:[seg],gen:[seg],inLive,inGen}], from,to,today,arrived,counts,violations}
@@ -2894,6 +2905,7 @@ function renderDiffGrid(d, opt){
       ? `<b style="color:#c0392b">❌ 문제 ${d.violations}곳</b> — 빨간 칸을 확인하세요.`
       : `<b style="color:#137a51">✅ 문제 없음</b> — 도래분(${d.arrived} 까지 시작)이 모두 그대로입니다.`)
     + ` · 그대로 ${c.same}${unit} · 신규 ${c["ok-new"]}${unit} · 미래 변경 ${c["ok-changed"]+c["ok-removed"]}${unit}`
+    + ((c["warn-key"]||0) ? ` · <b style="color:#c8622f">키 변경 ${c["warn-key"]}${unit}</b>(확인 권장)` : "")
     + ` · 기간 ${d.from} ~ ${d.to}`;
 }
 function cmpFail(msg){ document.getElementById("cmp_body").innerHTML=`<div class="cmpempty">${escapeHtml(msg)}</div>`;
@@ -3003,7 +3015,8 @@ function renderScheduleCanvas(A,B,title,dayW){
   const N=daysBetween(A,B)+1; if(N<1) return null;
   dayW=Math.max(20,Math.min(200, dayW||60));
   const showMemo=!!state.imgShowMemo;                 // 이름 아래 프리셋 메모 표시 (옵션)
-  const S=2, laneH=showMemo?36:26, lanePad=4, nameH=20, headerH=46, titleH=60, pad=24;
+  const memoH=showMemo?15:0;                          // 막대 아래 메모 전용 칸 높이
+  const S=2, laneH=26+memoH, lanePad=4, nameH=20, headerH=46, titleH=60, pad=24;
   const FONT="system-ui,-apple-system,'Apple SD Gothic Neo','Malgun Gothic',sans-serif";
   const types=imageTracks(tracksList(), state.imgHideTypes);
   const barsIn=state.bars.filter(b=>{ const so=daysBetween(A,b.startDate), eo=so+b.days; return so>=0 && eo<=N && types.includes(barType(b)); }); // 범위에 온전히 들어오는 막대만 (잘리는 것 제외)
@@ -3088,22 +3101,28 @@ function renderScheduleCanvas(A,B,title,dayW){
     const lanesY=ty+nameH;
     for(const b of barsIn){ if(barType(b)!==t) continue; const so=daysBetween(A,b.startDate), eo=so+b.days;
       const segS=Math.max(so,0), segE=Math.min(eo,N);
-      const x=gridX+segS*dayW+1.5, ww=Math.max(6,(segE-segS)*dayW-3), by=lanesY+lanePad+(b.subLane||0)*laneH, bh2=laneH-4;
+      const x=gridX+segS*dayW+1.5, ww=Math.max(6,(segE-segS)*dayW-3), by=lanesY+lanePad+(b.subLane||0)*laneH, bh2=laneH-4-memoH;
       ctx.fillStyle=barColor(b); roundRectPath(ctx,x,by,ww,bh2,4); ctx.fill();
       ctx.strokeStyle="rgba(0,0,0,.18)"; ctx.lineWidth=1; ctx.stroke();
       ctx.save(); roundRectPath(ctx,x,by,ww,bh2,4); ctx.clip();
-      const badgeY=showMemo?by+bh2/2-6:by+bh2/2;
+      const badgeY=by+bh2/2;
       ctx.fillStyle="rgba(0,0,0,.16)"; roundRectPath(ctx,x+4,badgeY-7,15,14,3); ctx.fill();
       ctx.fillStyle="#1a1a1a"; ctx.font=`700 9px ${FONT}`; ctx.textAlign="center"; ctx.fillText(typeCode(barType(b)), x+11.5, badgeY);
-      const memo=showMemo ? String((defOf(b)||{}).memo||"").replace(/\s*\n+\s*/g," ").trim() : "";
-      ctx.textAlign="left";
-      if(memo){
-        ctx.font=`600 11px ${FONT}`; ctx.fillText(barName(b), x+23, by+bh2/2-6);
-        ctx.fillStyle="rgba(0,0,0,.62)"; ctx.font=`500 9px ${FONT}`; ctx.fillText(memo, x+23, by+bh2/2+7);
-      } else {
-        ctx.font=`600 11px ${FONT}`; ctx.fillText(barName(b), x+23, by+bh2/2);
-      }
+      ctx.textAlign="left"; ctx.font=`600 11px ${FONT}`; ctx.fillText(barName(b), x+23, by+bh2/2);
       ctx.restore();
+      // 메모는 막대 밖 «아래 칸» 에 따로 그린다 (막대 안에 겹쳐 넣으면 이름과 붙어 읽기 어려움)
+      if(showMemo){
+        const memo=String((defOf(b)||{}).memo||"").replace(/\s*\n+\s*/g," ").trim();
+        if(memo){
+          const my=by+bh2+1;
+          ctx.fillStyle="#ffffff"; ctx.strokeStyle="rgba(0,0,0,.10)"; ctx.lineWidth=1;
+          roundRectPath(ctx,x,my,ww,memoH-2,3); ctx.fill(); ctx.stroke();
+          ctx.save(); roundRectPath(ctx,x,my,ww,memoH-2,3); ctx.clip();
+          ctx.fillStyle="#5b6472"; ctx.font=`500 9px ${FONT}`; ctx.textAlign="left"; ctx.textBaseline="middle";
+          ctx.fillText(memo, x+5, my+(memoH-2)/2);
+          ctx.restore();
+        }
+      }
     }
     ty+=bh; ctx.strokeStyle="#dfe3e8"; ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(gridX,ty-.5); ctx.lineTo(gridX+gridW,ty-.5); ctx.stroke();
   }
