@@ -561,8 +561,8 @@
     <form method="dialog" class="dlg">
       <h3>📋 토너먼트 추출</h3>
       <div class="meta">같은 <b>토너 DefKey</b> 막대들 → 1개 컨텐츠로 묶임. ContentId = <code>토너 DefKey</code> 그대로, 각 막대 = CustomSeasonData(시즌). DefKey 는 📤 추출 설정에서 입력.</div>
-      <div class="row"><label>이 날짜부터</label><input id="tn_from" type="date"></div>
-      <div class="meta">비우면 전체. 지정 시 <b>시작일이 이 날짜 이후(포함)</b>인 막대만 시즌에 포함.<br><b>덮어쓰기가 아니라 이어붙이기입니다</b> — 이 날짜 <b>앞</b>의 운영툴 기존 시즌은 아래 JSON 에서 그대로 가져와 유지합니다. 경계에 걸쳐 새 시즌과 겹치면 <b>위반</b>으로 잡힙니다.</div>
+      <div class="row"><label>이 날짜부터</label><input id="tn_from" type="date"> <label style="margin-left:10px">이 날짜까지</label> <input id="tn_to" type="date"></div>
+      <div class="meta">비우면 제한 없음. 지정 시 <b>시작일이 그 범위 안</b>인 막대만 새로 뽑습니다.<br><b>덮어쓰기가 아니라 이어붙이기입니다</b> — 범위 <b>앞뒤</b>의 운영툴 기존 시즌은 아래 JSON 에서 그대로 가져와 유지합니다. 경계에 걸쳐 새 시즌과 겹치면 <b>위반</b>으로 잡힙니다.</div>
       <details style="margin:10px 0">
         <summary style="cursor:pointer;font-weight:600;font-size:13px">⚙ 고정값 설정 (모든 스케쥴 토너 공통) — 거의 바꿀 일 없음</summary>
         <div class="tnsetup">
@@ -1783,6 +1783,7 @@ function migrate(){ // 부스트 → 가챠부스트 (타입 분리 이전 데�
   if(state.liveUseEnd===undefined) state.liveUseEnd=false;
   if(state.liveBase===undefined) state.liveBase="";
   if(state.tourneyFromDate===undefined) state.tourneyFromDate="";
+  if(state.tourneyToDate===undefined) state.tourneyToDate="";
   if(state.offlineFromDate===undefined) state.offlineFromDate="";
   if(!Array.isArray(state.dimmedTypes)) state.dimmedTypes=[];
   if(!Array.isArray(state.imgHideTypes)) state.imgHideTypes=(state.dimmedTypes||[]).slice();
@@ -2459,9 +2460,9 @@ document.getElementById("cl_ok").addEventListener("click",async()=>{
 });
 // ===== 토너먼트 운영툴용 JSON 추출 (고정 베이스 + 스케쥴 토너) =====
 function pad2(n){ return String(n).padStart(2,"0"); }
-function buildTournamentJSON(def, fromDate){
+function buildTournamentJSON(def, fromDate, toDate){
   // 같은 토너 DefKey 막대들 → 1개 레코드 (CustomSeasonDatas 로 묶음). ContentId = Tournament_{DefKey}
-  const tgtBars = state.bars.filter(b=>{ const d=defOf(b); return barType(b)==="토너먼트" && d && (d.exportTargets||[]).includes("tournament") && (!fromDate || b.startDate>=fromDate); });
+  const tgtBars = state.bars.filter(b=>{ const d=defOf(b); return barType(b)==="토너먼트" && d && (d.exportTargets||[]).includes("tournament") && (!fromDate || b.startDate>=fromDate) && (!toDate || b.startDate<=toDate); });
   const byKey={}, noKey=[];
   for(const b of tgtBars){ const d=defOf(b); const k=((d&&d.tourneyDefKey)||"").trim();
     if(!k){ noKey.push(barName(b)); continue; }
@@ -2478,11 +2479,14 @@ function buildTournamentJSON(def, fromDate){
   const inherit = def.InheritLive!==false;   // 기존 ContentId 는 운영툴 설정값 그대로 (시즌·PeriodValue 만 갱신)
   // 「이 날짜부터」는 덮어쓰기가 아니라 **이어붙이기**다. fromDate 앞의 운영툴 기존 시즌은 그대로 보존
   // (임포트가 레코드를 통째 교체하므로, 여기서 빠뜨리면 이미 도래한 시즌 기록이 사라진다).
+  // 범위 **앞**(fromDate 이전)과 **뒤**(toDate 이후)의 기존 시즌을 모두 그대로 이어붙인다.
+  // 뒤쪽을 빼먹으면 「이 날짜까지」로 자를 때 범위 밖 미래 시즌이 조용히 사라진다.
   const priorSeasons=(cid)=>{
-    if(!fromDate) return [];                                   // 범위 제한 없음 = 전체를 새로 뽑으므로 이어붙일 것 없음
+    if(!fromDate && !toDate) return [];                        // 범위 제한 없음 = 전체를 새로 뽑으므로 이어붙일 것 없음
     const lr=liveMap.get(cid), cs=lr&&lr.SeasonSetting&&lr.SeasonSetting.CustomSeasonDatas;
     if(!Array.isArray(cs)) return [];
-    return cs.filter(s=>String((s&&s.StartAt)||"").slice(0,10) < fromDate)
+    return cs.filter(s=>{ const d=String((s&&s.StartAt)||"").slice(0,10);
+             return (fromDate && d<fromDate) || (toDate && d>toDate); })
              .map(s=>({ StartAt:s.StartAt, EndAt:s.EndAt }));
   };
   const sched=[], inherited=[]; let seasonTotal=0, keptTotal=0; const durWarn=[];
@@ -2532,8 +2536,8 @@ function buildTournamentJSON(def, fromDate){
   return { records:[...map.values()], baseCount:base.length, typeCount:sched.length, seasonTotal, keptTotal, noKey, durWarn, inherited, inherit, knownKeys };
 }
 // 오프라인 테스트용 슬림 추출 (생성 스케쥴 토너만, 5필드)
-function buildOfflineTournamentJSON(def, fromDate){
-  const tgtBars = state.bars.filter(b=>{ const d=defOf(b); return barType(b)==="토너먼트" && d && (d.exportTargets||[]).includes("tournament") && (!fromDate || b.startDate>=fromDate); });
+function buildOfflineTournamentJSON(def, fromDate, toDate){
+  const tgtBars = state.bars.filter(b=>{ const d=defOf(b); return barType(b)==="토너먼트" && d && (d.exportTargets||[]).includes("tournament") && (!fromDate || b.startDate>=fromDate) && (!toDate || b.startDate<=toDate); });
   const byKey={}, noKey=[];
   for(const b of tgtBars){ const d=defOf(b); const k=((d&&d.tourneyDefKey)||"").trim();
     if(!k){ noKey.push(barName(b)); continue; }
@@ -2669,6 +2673,7 @@ function fillTourneyForm(){ const d=state.tourneyDefaults||defaultTourneyDefault
   document.getElementById("tn_inherit").checked=(d.InheritLive!==false);
   document.getElementById("tn_base").value=state.tourneyBase||"";
   document.getElementById("tn_from").value=state.tourneyFromDate||"";
+  document.getElementById("tn_to").value=state.tourneyToDate||"";
   document.getElementById("tn_status").textContent="";
 }
 function readTourneyForm(){
@@ -2700,11 +2705,11 @@ document.getElementById("copyTourney").addEventListener("click",()=>{
 let offRes=null;
 function offCalc(){
   const def=readTourneyForm();
-  const from=document.getElementById("tn_from").value||"";
-  offRes=buildOfflineTournamentJSON(def, from);
+  const from=document.getElementById("tn_from").value||"", to=document.getElementById("tn_to").value||"";
+  offRes=buildOfflineTournamentJSON(def, from, to);
   const list=document.getElementById("tn_offlist");
   if(!offRes.count){
-    list.innerHTML=`<div class="empty">대상 없음 — 📤 추출설정에서 '토너먼트 운영툴' 체크 + '토너 DefKey' 입력${from?`, 또는 ${from} 이후 막대가 없음`:""}.</div>`;
+    list.innerHTML=`<div class="empty">대상 없음 — 📤 추출설정에서 '토너먼트 운영툴' 체크 + '토너 DefKey' 입력${from?`, 또는 ${from||'처음'}~${to||'끝'} 범위에 막대가 없음`:""}.</div>`;
   } else {
     list.innerHTML=offRes.records.map(r=>{
       const first=r.seasons[0], last=r.seasons[r.seasons.length-1];
@@ -2712,7 +2717,7 @@ function offCalc(){
       return `<div class="verrow"><span class="vn">${escapeHtml(r.contentId)} · ${escapeHtml(r.description)}</span><span class="vm">시즌 ${r.seasons.length}개 · ${range}</span></div>`;
     }).join("");
   }
-  let st=`토너 ${offRes.count}종 · 시즌 ${offRes.seasonTotal}개${from?` (${from} 이후)`:" (전체)"} · rewardDurationMin ${def.RewardDurationMin}`;
+  let st=`토너 ${offRes.count}종 · 시즌 ${offRes.seasonTotal}개${(from||to)?` (${from||"처음"}~${to||"끝"})`:" (전체)"} · rewardDurationMin ${def.RewardDurationMin}`;
   if(offRes.noKey.length) st+=` · ⚠ DefKey 미입력 제외 ${offRes.noKey.length}건: ${offRes.noKey.join(", ")}`;
   document.getElementById("tn_offinfo").textContent=st;
 }
@@ -2733,6 +2738,7 @@ function persistTourneyForm(){ // 입력 즉시 state 반영 → 취소/닫아�
   state.tourneyDefaults=readTourneyForm();
   state.tourneyBase=document.getElementById("tn_base").value;
   state.tourneyFromDate=document.getElementById("tn_from").value;
+  state.tourneyToDate=document.getElementById("tn_to").value;
   save();
 }
 tourneyDlg.addEventListener("input", persistTourneyForm);
@@ -2923,7 +2929,7 @@ function renderTourneyDiff(){
   if(!raw) return cmpFail("운영툴 현재 JSON 이 비어 있습니다. 위 칸에 붙여넣으면 기존 일정과 나란히 비교해 드립니다.");
   let live; try{ live=JSON.parse(raw); if(!Array.isArray(live)) throw new Error("배열이 아님"); }
   catch(e){ return cmpFail("운영툴 JSON 파싱 실패: "+e.message); }
-  let res; try{ res=buildTournamentJSON(readTourneyForm(), document.getElementById("tn_from").value||""); }
+  let res; try{ res=buildTournamentJSON(readTourneyForm(), document.getElementById("tn_from").value||"", document.getElementById("tn_to").value||""); }
   catch(e){ return cmpFail("추출 계산 실패: "+e.message); }
   const d=buildTourneyDiff(live, res.records, todayISO(), res.knownKeys);
   if(!d.rows.length) return cmpFail("비교할 시즌이 없습니다.");
@@ -2947,7 +2953,7 @@ function runTourneyVerify(){
   if(!raw){ box.innerHTML=`<div class="vbox warn"><div class="vhead">⚠ 운영툴 현재 JSON 없음 — 라이브 검증 불가</div>기존 토너를 덮어쓸 때 <b>도래한 시즌이 훼손</b>돼도 잡아낼 수 없습니다. 운영툴에서 JSON 추출 후 위 칸에 붙여넣으세요.</div>`; return null; }
   let live; try{ live=JSON.parse(raw); if(!Array.isArray(live)) throw new Error("배열이 아님"); }
   catch(e){ box.innerHTML=`<div class="vbox bad"><div class="vhead">❌ 운영툴 JSON 파싱 실패</div>${escapeHtml(e.message)}</div>`; return null; }
-  let res; try{ res=buildTournamentJSON(readTourneyForm(), document.getElementById("tn_from").value||""); }
+  let res; try{ res=buildTournamentJSON(readTourneyForm(), document.getElementById("tn_from").value||"", document.getElementById("tn_to").value||""); }
   catch(e){ box.innerHTML=`<div class="vbox bad"><div class="vhead">❌ 추출 계산 실패</div>${escapeHtml(e.message)}</div>`; return null; }
   const v=verifyTourneyAgainstLive(live, res.records, todayISO(), res.knownKeys);
   const li=a=>a.map(x=>`<li><code>${escapeHtml(x.sk)}</code> · <b>${escapeHtml(x.type)}</b> — ${escapeHtml(x.detail)}</li>`).join("");
@@ -2970,14 +2976,14 @@ document.getElementById("tn_info").addEventListener("click",()=>{ document.getEl
 document.getElementById("vi_close").addEventListener("click",()=>vinfoDlg.close());
 document.getElementById("tn_inherit").addEventListener("change",()=>{ persistTourneyForm(); runTourneyVerify(); if(document.getElementById("tn_offbox").open) offCalc(); });
 document.getElementById("tn_base").addEventListener("change",runTourneyVerify);
-document.getElementById("tn_from").addEventListener("change",()=>{ runTourneyVerify(); if(document.getElementById("tn_offbox").open) offCalc(); });
+["tn_from","tn_to"].forEach(id=>document.getElementById(id).addEventListener("change",()=>{ persistTourneyForm(); runTourneyVerify(); if(document.getElementById("tn_offbox").open) offCalc(); }));
 document.getElementById("tn_cancel").addEventListener("click",()=>{ persistTourneyForm(); tourneyDlg.close(); });
 document.getElementById("tn_ok").addEventListener("click",async()=>{
   const def=readTourneyForm();
-  const from=document.getElementById("tn_from").value||"";
+  const from=document.getElementById("tn_from").value||"", to=document.getElementById("tn_to").value||"";
   persistTourneyForm();
-  let res; try{ res=buildTournamentJSON(def, from); }catch(err){ document.getElementById("tn_status").textContent="❌ 베이스 JSON 파싱 실패: "+err.message; return; }
-  if(!res.typeCount){ document.getElementById("tn_status").textContent="⚠ 토너 DefKey 입력된 대상 스케쥴이 없습니다."+(from?` (${from} 이후 조건)`:"")+(res.noKey.length?` (DefKey 미입력: ${res.noKey.length}건)`:""); return; }
+  let res; try{ res=buildTournamentJSON(def, from, to); }catch(err){ document.getElementById("tn_status").textContent="❌ 베이스 JSON 파싱 실패: "+err.message; return; }
+  if(!res.typeCount){ document.getElementById("tn_status").textContent="⚠ 토너 DefKey 입력된 대상 스케쥴이 없습니다."+((from||to)?` (${from||"처음"}~${to||"끝"} 조건)`:"")+(res.noKey.length?` (DefKey 미입력: ${res.noKey.length}건)`:""); return; }
   // 라이브 훼손 검증 — 위반 있으면 확인 후에만 진행, 운영툴 JSON 없으면 경고
   const v=runTourneyVerify();
   if(!v){ if(!confirm("운영툴 현재 JSON 이 없어 라이브 훼손 검증을 못 했습니다.\n(도래한 시즌이 삭제·변경돼도 잡히지 않음)\n\n그래도 추출할까요?")) return; }
